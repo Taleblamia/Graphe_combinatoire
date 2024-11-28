@@ -8,68 +8,8 @@ Original file is located at
 """
 
 import numpy as np
-
-def matrices1_ledm(n):
-  M  = np.zeros((n,n))
-  for i in range(n):
-    for j in range(n):
-      M[i,j]=(i-j)**2
-  return M
-
 from scipy.linalg import circulant
-def matrices2_slackngon(n):
-  M  = circulant(np.cos(np.pi/n)-np.cos(np.pi/n + 2*np.pi*np.arange(0,n,1)/n))
-  M /= M[0,2]
-  M  = np.maximum(M,0)
-  for i in range(n):
-    M[i,i] = 0
-    if i<n-1:
-      M[i,i+1] = 0
-    else:
-      M[i,0] = 0
-  return M
-
-def fobj(M,P,tol=1e-14):
-  sing_values = np.linalg.svd(P*np.sqrt(M), compute_uv=False) # Calcul des valeurs singulières de la matrice P.*sqrt(M)
-  ind_nonzero = np.where(sing_values > tol)[0]                # indices des valeurs > tolérance donnée
-  return len(ind_nonzero), sing_values[ind_nonzero[-1]]       # on retourne objectif1=rang et objectif2=plus petite val sing. non-nulle
-
-def compareP1betterthanP2(M,P1,P2):
-  r1, s1 = fobj(M,P1) #on récupère les deux objectifs pour le pattern P1
-  r2, s2 = fobj(M,P2) #on récupère les deux objectifs pour le pattern P2
-  if r1 != r2:        #on traite les objectifs de façon lexicographique :
-      return r1 < r2  # d'abord les valeurs du rang, et si celles-ci sont égales
-  return s1 < s2      # alors on prend en compte la valeur de la + petite valeur singulière
-
-def metaheuristic(M):
-  bestPattern = np.ones(M.shape) #pattern initial
-
-  ... #votre méthode
-
-  return bestPattern
-
-M = np.array([[4,0,1],[1,1,1],[1,1,0]])
-P1 = np.array([[1,1,-1],[-1,1,1],[1,-1,-1]])
-P2 = np.array([[-1,1,-1],[-1,-1,1],[1,1,-1]])
-print(compareP1betterthanP2(M,P1,P2))
-print(np.linalg.svd(P1*np.sqrt(M), compute_uv=False))
-
-M = matrices2_slackngon(7)
-P = np.array([[1,1,1,1,1,-1,1],[1,1,1,-1,1,-1,1],[1,1,1,1,1,1,-1],[1,-1,1,1,1,-1,-1],[1,1,-1,1,1,1,1],[1,-1,1,-1,-1,1,1],[1,1,1,1,1,1,1]])
-print(fobj(M,P))
-
-
-
-
-
-
-
-
-
-////////////////////////////////////////////////////////////////
-import numpy as np
-from scipy.linalg import circulant
-
+#%%
 def matrices1_ledm(n):
     M = np.zeros((n, n))
     for i in range(n):
@@ -94,6 +34,43 @@ def fobj(M, P, tol=1e-14):
     ind_nonzero = np.where(sing_values > tol)[0]                  # Indices > tolérance
     return len(ind_nonzero), sing_values[ind_nonzero[-1]]         # Retourne rang et petite valeur singulière
 
+def calculate_rank(P, M):
+    """Calcule le rang de la matrice P ∘ M."""
+    return np.linalg.matrix_rank(P * M)
+#%%
+def generate_neighbors(P, neighborhood, num_neighbors=1000):
+    """Génère des voisins à partir de la solution actuelle P."""
+    neighbors = []
+    m, n = P.shape
+
+    for _ in range(num_neighbors):
+        P_new = P.copy()
+
+        if neighborhood == 1:  # Modifier un seul élément
+            i, j = np.random.randint(0, m), np.random.randint(0, n)
+            P_new[i, j] *= -1
+
+        elif neighborhood == 2:  # Modifier une ligne complète
+            i = np.random.randint(0, m)
+            P_new[i, :] *= -1
+
+        elif neighborhood == 3:  # Modifier une colonne complète
+            j = np.random.randint(0, n)
+            P_new[:, j] *= -1
+
+        elif neighborhood == 4:  # Modifier plusieurs éléments aléatoires
+            num_changes = np.random.randint(1, m * n // 4)  # Modifier jusqu'à 25% des éléments
+            for _ in range(num_changes):
+                i, j = np.random.randint(0, m), np.random.randint(0, n)
+                P_new[i, j] *= -1
+
+        neighbors.append(P_new)
+
+    return neighbors
+
+
+
+#%%
 def compareP1betterthanP2(M, P1, P2):
     r1, s1 = fobj(M, P1)  # Objectifs pour P1
     r2, s2 = fobj(M, P2)  # Objectifs pour P2
@@ -101,63 +78,33 @@ def compareP1betterthanP2(M, P1, P2):
         return r1 < r2    # Priorité au rang
     return s1 < s2        # Ensuite à la plus petite valeur singulière
 
-def generate_neighbors(P):
-    """
-    Génère des voisins en inversant les signes de certains éléments de P.
-    """
-    neighbors = []
-    for i in range(P.shape[0]):
-        for j in range(P.shape[1]):
-            neighbor = P.copy()
-            neighbor[i, j] *= -1
-            neighbors.append(neighbor)
-    return neighbors
-
 def metaheuristic(M, max_iter=100, tabu_size=10):
-    """
-    Métaheuristique basée sur l'algorithme Tabou pour résoudre le problème du square root rank.
-    """
-    bestPattern = np.ones(M.shape)  # Pattern initial
-    tabu_list = []                 # Liste tabou
-    best_objective = fobj(M, bestPattern)  # Objectif initial
-    currentPattern = bestPattern.copy()
+    """Recherche à voisinage variable pour minimiser le rang de P ∘ M."""
+    m, n = M.shape
+    P_best = np.ones((m, n))  # Initialisation avec P composé de +1
+    rank_best = calculate_rank(P_best, M)  # Rang initial
 
     for iteration in range(max_iter):
-        neighbors = generate_neighbors(currentPattern)  # Génère des voisins
-        best_neighbor = None
-        best_neighbor_objective = None
+        for neighborhood in range(1, 5):  # Explorer 4 types de voisinage
+            neighbors = generate_neighbors(P_best, neighborhood,100)
+            sprime = neighbors[np.random.randint(0, 100)]
+            neighbors = generate_neighbors(sprime, neighborhood,1000)
 
-        for neighbor in neighbors:
-            if any(np.array_equal(neighbor, tabu) for tabu in tabu_list):
-                continue  # Ignore les voisins dans la liste tabou
+            for P_candidate in neighbors:
+                if compareP1betterthanP2(M,P_candidate,P_best):
+                    P_best = P_candidate
+                    break  # Sortir pour explorer à nouveau à partir de cette meilleure solution
 
-            neighbor_objective = fobj(M, neighbor)
-            if best_neighbor is None or compareP1betterthanP2(M, neighbor, best_neighbor):
-                best_neighbor = neighbor
-                best_neighbor_objective = neighbor_objective
+    return P_best
 
-        if best_neighbor is None:
-            break  # Aucun voisin valide trouvé
 
-        currentPattern = best_neighbor
 
-        # Mise à jour du meilleur résultat
-        if compareP1betterthanP2(M, currentPattern, bestPattern):
-            bestPattern = currentPattern
-            best_objective = best_neighbor_objective
-
-        # Mise à jour de la liste tabou
-        tabu_list.append(currentPattern)
-        if len(tabu_list) > tabu_size:
-            tabu_list.pop(0)
-
-        print(f"Iteration {iteration + 1}: Best rank so far: {best_objective[0]}")
-
-    return bestPattern
-
+#%%
 # Exemple d'utilisation
 M = np.array([[4, 0, 1], [1, 1, 1], [1, 1, 0]])
+M = matrices2_slackngon(7)
 best_pattern = metaheuristic(M)
 print("Best pattern found:")
 print(best_pattern)
+#%%
 print("Objective:", fobj(M, best_pattern))
