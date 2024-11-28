@@ -182,11 +182,12 @@ def matrices2_slackngon(n):
 def fobj(M, P, tol=1e-14):
     sing_values = np.linalg.svd(P * np.sqrt(M), compute_uv=False)  # Calcul des valeurs singulières de la matrice P.*sqrt(M)
     ind_nonzero = np.where(sing_values > tol)[0]  # indices des valeurs > tolérance donnée
-    return len(ind_nonzero), sing_values[ind_nonzero[-1]]  # on retourne objectif1=rang et objectif2=plus petite val sing. non-nulle
+    valeurs_non_nulles = [val for val in sing_values if val > tol]  # Filtrer les valeurs > tolérance
+    return len(ind_nonzero), sing_values[ind_nonzero[-1]], valeurs_non_nulles  # on retourne objectif1=rang et objectif2=plus petite val sing. non-nulle
 
 def compareP1betterthanP2(M, P1, P2):
-    r1, s1 = fobj(M, P1)  # on récupère les deux objectifs pour le pattern P1
-    r2, s2 = fobj(M, P2)  # on récupère les deux objectifs pour le pattern P2
+    r1, s1, sv1 = fobj(M, P1)  # on récupère les deux objectifs pour le pattern P1
+    r2, s2, sv2 = fobj(M, P2)  # on récupère les deux objectifs pour le pattern P2
     if r1 != r2:  # on traite les objectifs de façon lexicographique :
         return r1 < r2  # d'abord les valeurs du rang, et si celles-ci sont égales
     return s1 < s2  # alors on prend en compte la valeur de la plus petite valeur singulière
@@ -199,7 +200,7 @@ def construire_solution(M, alpha=0.5):
     # Générer un ensemble de candidats
     for _ in range(100):  # Nombre de candidats à générer
         pattern = np.random.choice([1, -1], size=(m, n))  # Matrix de taille (m, n)
-        rang, val = fobj(M, pattern)
+        rang, val, sing_values = fobj(M, pattern)
         candidats.append(pattern)
         scores.append((rang, val))
 
@@ -224,14 +225,14 @@ def construire_solution(M, alpha=0.5):
 def recherche_locale(M, P):
     m, n = P.shape
     meilleur_P = P.copy()
-    meilleur_rang, meilleure_val = fobj(M, meilleur_P)
+    meilleur_rang, meilleure_val, sv = fobj(M, meilleur_P)
 
     # Tester les voisins (une inversion à la fois)
     for i in range(m):
         for j in range(n):
             voisin = meilleur_P.copy()
             voisin[i, j] *= -1  # Inversion du coefficient
-            rang, val = fobj(M, voisin)
+            rang, val, sv = fobj(M, voisin)
             if rang < meilleur_rang or (rang == meilleur_rang and val < meilleure_val):
                 meilleur_P = voisin
                 meilleur_rang, meilleure_val = rang, val
@@ -241,7 +242,7 @@ def recherche_locale(M, P):
 def metaheuristic(M, iterations, alpha_init=0.3, alpha_step=0.1, alpha_bounds=(0.1, 0.9)):
     m, n = M.shape
     meilleur_pattern = np.ones((m, n))  # Pattern initial
-    meilleur_rang, meilleure_val = fobj(M, meilleur_pattern)
+    meilleur_rang, meilleure_val , sing_values = fobj(M, meilleur_pattern)
     alpha = alpha_init
 
     for it in range(iterations):
@@ -254,7 +255,7 @@ def metaheuristic(M, iterations, alpha_init=0.3, alpha_step=0.1, alpha_bounds=(0
         # Comparer avec la meilleure solution actuelle
         if compareP1betterthanP2(M, pattern_ameliore, meilleur_pattern):
             meilleur_pattern = pattern_ameliore
-            meilleur_rang, meilleure_val = fobj(M, meilleur_pattern)
+            meilleur_rang, meilleure_val, sing_values = fobj(M, meilleur_pattern)
             print(f"Iter {it+1}: Nouvelle meilleure solution avec rang={meilleur_rang}, val={meilleure_val:.6f}")
 
         # Mise à jour dynamique de alpha
@@ -279,6 +280,16 @@ def lecture_fichier(path):
         
     return np.array(data)   # Renvoie la matrice sous forme de tableau numpy
 
+def ecriture_fichier(path, P, valeurs_sing):
+    with open(path, 'w') as fout:
+        # Écrire le pattern ligne par ligne
+        for ligne in P:
+            fout.write(' '.join(map(str, ligne)) + '\n')
+
+        # Écrire les valeurs singulières non nulles
+        for val in valeurs_sing:
+            fout.write(f"{val}\n")
+        
 # Test de l'algorithme
 if __name__ == "__main__":
     M = lecture_fichier('correl5_matrice.txt')
@@ -286,8 +297,12 @@ if __name__ == "__main__":
     print(M)
     #M = matrices2_slackngon(7)  # Générer la matrice du problème
 
-    best_pattern = metaheuristic(M, iterations=1000, alpha_init=0.8, alpha_step=0.05)
+    best_pattern = metaheuristic(M, iterations=50, alpha_init=0.8, alpha_step=0.05)
     print("Meilleur pattern trouvé :")
     print(best_pattern)
-    print(fobj(M, best_pattern))
+    print("Résultat fobj : \n", fobj(M, best_pattern)[0],fobj(M, best_pattern)[1])
+    
+    # Écriture des résultats dans un fichier
+    ecriture_fichier('resultat_pattern.txt',best_pattern, fobj(M, best_pattern)[2])
+    
 
