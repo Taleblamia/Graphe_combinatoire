@@ -192,13 +192,13 @@ def compareP1betterthanP2(M, P1, P2):
     return s1 < s2  # alors on prend en compte la valeur de la plus petite valeur singulière
 
 def construire_solution(M, alpha=0.5):
-    n = M.shape[0]
+    m, n = M.shape  # m et n sont les dimensions de la matrice M
     candidats = []
     scores = []
 
     # Générer un ensemble de candidats
     for _ in range(100):  # Nombre de candidats à générer
-        pattern = np.random.choice([1, -1], size=(n, n))
+        pattern = np.random.choice([1, -1], size=(m, n))  # Matrix de taille (m, n)
         rang, val = fobj(M, pattern)
         candidats.append(pattern)
         scores.append((rang, val))
@@ -222,13 +222,13 @@ def construire_solution(M, alpha=0.5):
 
 # Recherche locale (simple inversion des coefficients pour améliorer)
 def recherche_locale(M, P):
-    n, m = P.shape
+    m, n = P.shape
     meilleur_P = P.copy()
     meilleur_rang, meilleure_val = fobj(M, meilleur_P)
 
     # Tester les voisins (une inversion à la fois)
-    for i in range(n):
-        for j in range(m):
+    for i in range(m):
+        for j in range(n):
             voisin = meilleur_P.copy()
             voisin[i, j] *= -1  # Inversion du coefficient
             rang, val = fobj(M, voisin)
@@ -239,8 +239,8 @@ def recherche_locale(M, P):
     return meilleur_P
 
 def metaheuristic(M, iterations, alpha_init=0.3, alpha_step=0.1, alpha_bounds=(0.1, 0.9)):
-    n, m = M.shape
-    meilleur_pattern = np.ones((n, m))  # Pattern initial
+    m, n = M.shape
+    meilleur_pattern = np.ones((m, n))  # Pattern initial
     meilleur_rang, meilleure_val = fobj(M, meilleur_pattern)
     alpha = alpha_init
 
@@ -252,7 +252,7 @@ def metaheuristic(M, iterations, alpha_init=0.3, alpha_step=0.1, alpha_bounds=(0
         pattern_ameliore = recherche_locale(M, pattern_initial)
         
         # Comparer avec la meilleure solution actuelle
-        if compareP1betterthanP2(M,pattern_ameliore, meilleur_pattern ):
+        if compareP1betterthanP2(M, pattern_ameliore, meilleur_pattern):
             meilleur_pattern = pattern_ameliore
             meilleur_rang, meilleure_val = fobj(M, meilleur_pattern)
             print(f"Iter {it+1}: Nouvelle meilleure solution avec rang={meilleur_rang}, val={meilleure_val:.6f}")
@@ -274,22 +274,20 @@ def lecture_fichier(path):
         
         # Lecture des lignes suivantes contenant les éléments de la matrice
         for _ in range(m):
-            ligne = list(map(int, fin.readline().rstrip().split()))  
+            ligne = list(map(float, fin.readline().rstrip().split()))  
             data.append(ligne)  
         
-    return np.array(data)  
-
+    return np.array(data)   # Renvoie la matrice sous forme de tableau numpy
 
 # Test de l'algorithme
 if __name__ == "__main__":
-    M= lecture_fichier('exempleslide_matrice.txt')
+    M = lecture_fichier('correl5_matrice.txt')
     print(M.shape)
     print(M)
     #M = matrices2_slackngon(7)  # Générer la matrice du problème
 
-    best_pattern = metaheuristic(M, iterations=50, alpha_init=0.7, alpha_step=0.05)
+    best_pattern = metaheuristic(M, iterations=1000, alpha_init=0.8, alpha_step=0.05)
     print("Meilleur pattern trouvé :")
     print(best_pattern)
     print(fobj(M, best_pattern))
-
 
