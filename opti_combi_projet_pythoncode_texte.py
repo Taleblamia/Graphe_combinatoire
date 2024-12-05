@@ -156,7 +156,8 @@ best_pattern = metaheuristic(M)
 print("Best pattern found:")
 print(best_pattern)
 print(fobj(M, best_pattern))
-#%%
+#%% GRASP
+
 import numpy as np
 
 def matrices1_ledm(n):
@@ -292,7 +293,7 @@ def ecriture_fichier(path, P, valeurs_sing):
         
 # Test de l'algorithme
 if __name__ == "__main__":
-    M = lecture_fichier('correl5_matrice.txt')
+    M = lecture_fichier('exempleslide_matrice.txt')
     print(M.shape)
     print(M)
     #M = matrices2_slackngon(7)  # Générer la matrice du problème
@@ -305,4 +306,304 @@ if __name__ == "__main__":
     # Écriture des résultats dans un fichier
     ecriture_fichier('resultat_pattern.txt',best_pattern, fobj(M, best_pattern)[2])
     
+#%%
 
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.linalg import circulant
+
+def matrices1_ledm(n):
+    M = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            M[i, j] = (i - j) ** 2
+    return M
+
+def matrices2_slackngon(n):
+    M = circulant(np.cos(np.pi / n) - np.cos(np.pi / n + 2 * np.pi * np.arange(0, n, 1) / n))
+    M /= M[0, 2]
+    M = np.maximum(M, 0)
+    for i in range(n):
+        M[i, i] = 0
+        if i < n - 1:
+            M[i, i + 1] = 0
+        else:
+            M[i, 0] = 0
+    return M
+
+def fobj(M, P, tol=1e-14):
+    sing_values = np.linalg.svd(P * np.sqrt(M), compute_uv=False)
+    ind_nonzero = np.where(sing_values > tol)[0]
+    valeurs_non_nulles = [val for val in sing_values if val > tol]
+    return len(ind_nonzero), sing_values[ind_nonzero[-1]], valeurs_non_nulles
+
+def compareP1betterthanP2(M, P1, P2):
+    r1, s1, sv1 = fobj(M, P1)
+    r2, s2, sv2 = fobj(M, P2)
+    if r1 != r2:
+        return r1 < r2
+    return s1 < s2
+
+def construction_heuristique(M):
+    m, n = M.shape
+    P = np.zeros((m, n))
+    for i in range(m):
+        for j in range(n):
+            if i == j or i + j == n - 1:
+                P[i, j] = 1
+            else:
+                P[i, j] = -1
+    return P
+
+def random_matrix(m,n, r):
+    return ((np.random.rand(m,r)*10)@(np.random.rand(r,n)*10))**2
+
+def perturbation_solution(P, perturbation_factor=0.6):
+    """
+    Introduit une perturbation aléatoire dans la solution pour favoriser la diversification.
+    """
+    m, n = P.shape
+    for i in range(m):
+        for j in range(n):
+            if np.random.rand() < perturbation_factor:
+                P[i, j] = -P[i, j]  # Changer le signe de certaines cases
+    return P
+
+def metaheuristic_aco(M, n_ants=10, n_iterations=100, alpha=1.0, beta=1.0, Q=1.0, rho=0.5):
+    m, n = M.shape
+    tau = np.ones((m, n))  # Phéromones initiales
+    eta = 1 / (np.abs(M) + 1e-10)  # Visibilité initiale
+
+    best_pattern = construction_heuristique(M)
+    best_objective = fobj(M, best_pattern)  # Initialisation (rang, valeur singulière)
+
+    for t in range(n_iterations):
+        patterns = []
+        objectives = []
+
+        # --- Construction des solutions ---
+        for k in range(n_ants):
+            P = best_pattern.copy()
+            for i in range(m):
+                for j in range(n):
+                    prob = (tau[i, j]**alpha) * (eta[i, j]**beta)
+                    if np.random.rand() < prob / (2 * prob):
+                        P[i, j] = 1
+                    else:
+                        P[i, j] = -1
+            patterns.append(P)
+            objectives.append(fobj(M, P))
+
+        # --- Évaluation et mise à jour du meilleur ---
+        for pattern, obj in zip(patterns, objectives):
+            if compareP1betterthanP2(M, pattern, best_pattern if best_pattern is not None else pattern):
+                best_pattern = pattern
+                best_objective = obj
+
+        # --- Mise à jour des phéromones ---
+        tau *= (1 - rho)
+        for pattern, obj in zip(patterns, objectives):
+            rank, smallest_sv, _ = obj
+            contribution = Q / (1 + rank + smallest_sv)
+            tau += contribution * pattern
+
+        # --- Adaptation dynamique ---
+        if t % 10 == 0:  # Ajuste chaque 10 itérations
+            if np.var([obj[0] for obj in objectives]) < 0.1:  # Convergence rapide
+                beta += 0.1
+            else:
+                alpha += 0.1
+            rho = max(0.1, rho - 0.01)  # Réduit lentement l'évaporation
+
+        # Suivi
+        print(f"Itération {t + 1}/{n_iterations} : Meilleur rang = {best_objective[0]}, Plus petite valeur singulière = {best_objective[1]}")
+
+    return best_pattern
+
+
+def lecture_fichier(path):
+    with open(path, 'r') as fin:
+        m, n = map(int, fin.readline().rstrip().split())
+        data = []
+        for _ in range(m):
+            ligne = list(map(float, fin.readline().rstrip().split()))  
+            data.append(ligne)  
+    return np.array(data)
+
+def ecriture_fichier(path, P, valeurs_sing):
+    with open(path, 'w') as fout:
+        for ligne in P:
+            fout.write(' '.join(map(str, ligne)) + '\n')
+        for val in valeurs_sing:
+            fout.write(f"{val}\n")
+
+# Test de l'algorithme
+if __name__ == "__main__":
+    m= 100
+    n = 100
+    r = 2
+    #M = lecture_fichier('correl5_matrice.txt')
+    #M = lecture_fichier('exempleslide_matrice.txt')
+    M = random_matrix(m, n, r)
+    
+    
+    best_pattern = metaheuristic_aco(M, n_ants=15, n_iterations=100, alpha=1.0, beta=2.0, Q=1.0, evaporation_rate=0.1, diversification_factor=0.4)
+    
+    print("Meilleur pattern trouvé :")
+    print(best_pattern)
+    print("Résultat fobj : \n", fobj(M, best_pattern)[0],fobj(M, best_pattern)[1])
+    
+    ecriture_fichier('resultat_pattern.txt', best_pattern, fobj(M, best_pattern)[2])
+#%%
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.linalg import circulant
+
+def matrices1_ledm(n):
+    M = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            M[i, j] = (i - j) ** 2
+    return M
+
+def matrices2_slackngon(n):
+    M = circulant(np.cos(np.pi / n) - np.cos(np.pi / n + 2 * np.pi * np.arange(0, n, 1) / n))
+    M /= M[0, 2]
+    M = np.maximum(M, 0)
+    for i in range(n):
+        M[i, i] = 0
+        if i < n - 1:
+            M[i, i + 1] = 0
+        else:
+            M[i, 0] = 0
+    return M
+
+def fobj(M, P, tol=1e-14):
+    sing_values = np.linalg.svd(P * np.sqrt(M), compute_uv=False)
+    ind_nonzero = np.where(sing_values > tol)[0]
+    valeurs_non_nulles = [val for val in sing_values if val > tol]
+    return len(ind_nonzero), sing_values[ind_nonzero[-1]], valeurs_non_nulles
+
+def compareP1betterthanP2(M, P1, P2):
+    r1, s1, sv1 = fobj(M, P1)
+    r2, s2, sv2 = fobj(M, P2)
+    if r1 != r2:
+        return r1 < r2
+    return s1 < s2
+
+def perturbation_solution(P, perturbation_factor=0.6):
+    """
+    Introduit une perturbation aléatoire dans la solution pour favoriser la diversification.
+    """
+    m, n = P.shape
+    for i in range(m):
+        for j in range(n):
+            if np.random.rand() < perturbation_factor:
+                P[i, j] = -P[i, j]  # Changer le signe de certaines cases
+    return P
+
+def initialiser_pheromones(m, n, valeur_initiale=0.4):
+    """Initialise la matrice des phéromones."""
+    return np.full((m, n), valeur_initiale)
+
+def calculer_visibilite(M):
+    """Calcule la visibilité (heuristique) basée sur la matrice donnée M."""
+    eta = 1 / (M + 1e-10)  # Inverser M pour donner plus d'importance aux petites valeurs
+    return eta
+
+def calcul_probabilite(i, j, tau, eta, alpha, beta, options_disponibles):
+    """Calcule la probabilité pour aller de i à j."""
+    numerateur = (tau[i, j] ** alpha) * (eta[i, j] ** beta)
+    denominateur = sum((tau[i, k] ** alpha) * (eta[i, k] ** beta) for k in options_disponibles)
+    if denominateur == 0:
+        return 1 / len(options_disponibles)  # Distribution uniforme
+    return numerateur / denominateur
+
+def construire_solution(M, tau, eta, alpha, beta):
+    """Construit une solution pour une fourmi."""
+    m, n = M.shape
+    solution = []
+    options_disponibles = list(range(n))
+    P = np.zeros((m, n))  # Matrice des probabilités
+
+    for i in range(m):
+        for j in options_disponibles:
+            P[i, j] = calcul_probabilite(i, j, tau, eta, alpha, beta, options_disponibles)
+        # Sélection de j en fonction de P[i, :]
+        j = np.random.choice(options_disponibles, p=P[i, options_disponibles] / P[i, options_disponibles].sum())
+        solution.append((i, j))
+        options_disponibles.remove(j)  # Mise à jour des options disponibles
+
+    return solution
+
+def evaluer_solution(solution, M):
+    """Évalue une solution en fonction de la matrice M."""
+    score = sum(M[i, j] for i, j in solution)
+    return score
+
+def mise_a_jour_pheromones(tau, solutions, rho, Q):
+    """Met à jour la matrice des phéromones."""
+    tau *= (1 - rho)  # Évaporation des phéromones
+    for solution, qualite in solutions:
+        for (i, j) in solution:
+            tau[i, j] += Q / qualite  # Dépôt de phéromones proportionnel à la qualité
+
+def metaheuristic_aco(M, n_ants=10, n_iterations=100, alpha=1.0, beta=1.0, Q=1.0, rho=0.5):
+    m, n = M.shape
+    tau = initialiser_pheromones(m, n)  # Phéromones initiales
+    eta = calculer_visibilite(M)  # Visibilité initiale
+
+    best_pattern = np.zeros((m, n))  # Solution de départ
+    best_objective = float('inf')  # Score initial élevé
+
+    for t in range(n_iterations):
+        solutions = []
+        for _ in range(n_ants):
+            solution = construire_solution(M, tau, eta, alpha, beta)
+            score = evaluer_solution(solution, M)
+            solutions.append((solution, score))
+
+            if score < best_objective:
+                best_pattern = solution
+                best_objective = score
+
+        mise_a_jour_pheromones(tau, solutions, rho, Q)
+
+        print(f"Itération {t + 1}/{n_iterations}: Meilleur score = {best_objective}")
+
+    return best_pattern
+
+def lecture_fichier(path):
+    with open(path, 'r') as fin:
+        m, n = map(int, fin.readline().rstrip().split())
+        data = []
+        for _ in range(m):
+            ligne = list(map(float, fin.readline().rstrip().split()))  
+            data.append(ligne)  
+    return np.array(data)
+
+def ecriture_fichier(path, P, valeurs_sing):
+    with open(path, 'w') as fout:
+        for ligne in P:
+            fout.write(' '.join(map(str, ligne)) + '\n')
+        for val in valeurs_sing:
+            fout.write(f"{val}\n")
+
+def random_matrix(m, n, r):
+    return ((np.random.rand(m, r) * 10) @ (np.random.rand(r, n) * 10)) ** 2
+
+# Test de l'algorithme
+if __name__ == "__main__":
+    m = 6
+    n = 7
+    r = 2
+    M = random_matrix(m, n, r)
+    #M = lecture_fichier('correl5_matrice.txt')
+    #M = lecture_fichier('exempleslide_matrice.txt')
+    best_pattern = metaheuristic_aco(M, n_ants=15, n_iterations=100, alpha=1.0, beta=2.0, Q=1.0, rho=0.1)
+
+    print("Meilleur pattern trouvé :")
+    print(best_pattern)
+    print("Résultat fobj : \n", fobj(M, best_pattern)[0], fobj(M, best_pattern)[1])
+
+    ecriture_fichier('resultat_pattern.txt', best_pattern, fobj(M, best_pattern)[2])
