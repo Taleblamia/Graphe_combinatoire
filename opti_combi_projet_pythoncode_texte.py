@@ -305,7 +305,7 @@ if __name__ == "__main__":
     
     # Écriture des résultats dans un fichier
     ecriture_fichier('resultat_pattern.txt',best_pattern, fobj(M, best_pattern)[2])
-    
+
 #%%
 
 import numpy as np
