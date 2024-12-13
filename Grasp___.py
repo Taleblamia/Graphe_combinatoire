@@ -1,111 +1,4 @@
 
-import numpy as np
-import random
-
-
-def matrices1_ledm(n):
-  M  = np.zeros((n,n))
-  for i in range(n):
-    for j in range(n):
-      M[i,j]=(i-j)**2
-  return M
-
-from scipy.linalg import circulant
-def matrices2_slackngon(n):
-  M  = circulant(np.cos(np.pi/n)-np.cos(np.pi/n + 2*np.pi*np.arange(0,n,1)/n))
-  M /= M[0,2]
-  M  = np.maximum(M,0)
-  for i in range(n):
-    M[i,i] = 0
-    if i<n-1:
-      M[i,i+1] = 0
-    else:
-      M[i,0] = 0
-  return M
-
-def fobj(M,P):
-  sing_values = np.linalg.svd(P*np.sqrt(M), compute_uv=False)    # Calcul des valeurs singulières de la matrice P.*sqrt(M)
-  tol         = max(M.shape)*sing_values[0]*np.finfo(float).eps  # Calcul de la tolérance à utiliser pour la matrice P*sqrt(M)
-  ind_nonzero = np.where(sing_values > tol)[0]                   # indices des valeurs > tolérance
-  valeurs_non_nulles = [val for val in sing_values if val > tol]  # Filtrer les valeurs > tolérance
-  return len(ind_nonzero), sing_values[ind_nonzero[-1]], valeurs_non_nulles      # outputs: objectif1=rang, objectif2=plus petite val sing. non-nulle
-
-def compareP1betterthanP2(M, P1, P2):
-    r1, s1, sv1 = fobj(M, P1)  # on récupère les deux objectifs pour le pattern P1
-    r2, s2, sv2 = fobj(M, P2)  # on récupère les deux objectifs pour le pattern P2
-    if r1 != r2:  # on traite les objectifs de façon lexicographique :
-        return r1 < r2  # d'abord les valeurs du rang, et si celles-ci sont égales
-    return s1 < s2  # alors on prend en compte la valeur de la plus petite valeur singulière
-
-def construire_solution_guidée(M, alpha=0.3):
-    m, n = M.shape
-    candidats = []
-    scores = []
-
-    # Générer des candidats en favorisant les zones à fort poids dans M
-    for _ in range(20):  # Nombre de candidats à générer
-        pattern = construction_heuristique(M)  # Initialiser un pattern avec des 1
-        # Introduire des inversions (-1) en priorité dans les zones où M est dense
-        densite = M / M.max()  # Normaliser les valeurs de M pour avoir une densité relative
-        for i in range(m):
-            for j in range(n):
-                if np.random.rand() < densite[i, j]:  # Probabilité liée à la densité
-                    pattern[i, j] *= -1
-        rang, val, sing_values = fobj(M, pattern)
-        candidats.append(pattern)
-        scores.append((rang, val))
-
-    # Déterminer cmin et cmax
-    rangs, valeurs = zip(*scores)
-    cmin = min(rangs)
-    cmax = max(rangs)
-    seuil = cmin + alpha * (cmax - cmin)
-
-    # Construire la LCR
-    LCR = [c for c, (r, _) in zip(candidats, scores) if r <= seuil]
-    if not LCR:
-        raise ValueError("La liste des candidats restreinte (LCR) est vide. Vérifiez les paramètres de alpha.")
-    
-    # Sélectionner une matrice dans la LCR
-    index = np.random.randint(len(LCR))
-    return LCR[index]
-
-
-def recherche_locale_guidée(M, P, max_voisins=100):
-    m, n = P.shape
-    meilleur_P = P.copy()
-    meilleur_rang, meilleure_val, _ = fobj(M, meilleur_P)
-
-    # Trier les voisins en fonction des poids de M
-    voisins = [(i, j) for i in range(m) for j in range(n)]
-    voisins = sorted(voisins, key=lambda x: -M[x[0], x[1]])  # Priorité aux indices avec valeurs élevées dans M
-
-    voisins_a_tester = voisins[:max_voisins]  # Limiter aux voisins les plus prometteurs
-
-    for i, j in voisins_a_tester:
-        voisin = meilleur_P.copy()
-        voisin[i, j] *= -1  # Inversion du coefficient
-        rang, val, _ = fobj(M, voisin)
-        if rang < meilleur_rang or (rang == meilleur_rang and val < meilleure_val):
-            meilleur_P = voisin
-            meilleur_rang, meilleure_val = rang, val
-
-    return meilleur_P
-
-
-
-def construction_heuristique(M):
-    m, n = M.shape
-    P = np.zeros((m, n))
-    for i in range(m):
-        for j in range(n):
-            if i == j or i + j == n - 1:
-                P[i, j] = 1
-            else:
-                P[i, j] = -1
-    return P
-
-
 def grasp(M, X=100):
     m, n = M.shape
     num_candidats = 2 ** min(m, n) if min(m, n) < 17 else 100000
@@ -146,8 +39,133 @@ def grasp(M, X=100):
             grasp_data.append((col, rang_prec, _[1]))  # Collecte des métriques
 
     return P, rang_prec, grasp_data
+#%%
+import numpy as np
+import random
 
 
+def matrices1_ledm(n):
+  M  = np.zeros((n,n))
+  for i in range(n):
+    for j in range(n):
+      M[i,j]=(i-j)**2
+  return M
+
+from scipy.linalg import circulant
+def matrices2_slackngon(n):
+  M  = circulant(np.cos(np.pi/n)-np.cos(np.pi/n + 2*np.pi*np.arange(0,n,1)/n))
+  M /= M[0,2]
+  M  = np.maximum(M,0)
+  for i in range(n):
+    M[i,i] = 0
+    if i<n-1:
+      M[i,i+1] = 0
+    else:
+      M[i,0] = 0
+  return M
+
+def fobj(M,P):
+  sing_values = np.linalg.svd(P*np.sqrt(M), compute_uv=False)    # Calcul des valeurs singulières de la matrice P.*sqrt(M)
+  tol         = max(M.shape)*sing_values[0]*np.finfo(float).eps  # Calcul de la tolérance à utiliser pour la matrice P*sqrt(M)
+  ind_nonzero = np.where(sing_values > tol)[0]                   # indices des valeurs > tolérance
+  valeurs_non_nulles = [val for val in sing_values if val > tol]  # Filtrer les valeurs > tolérance
+  return len(ind_nonzero), sing_values[ind_nonzero[-1]], valeurs_non_nulles      # outputs: objectif1=rang, objectif2=plus petite val sing. non-nulle
+
+def compareP1betterthanP2(M, P1, P2):
+    r1, s1, sv1 = fobj(M, P1)  # on récupère les deux objectifs pour le pattern P1
+    r2, s2, sv2 = fobj(M, P2)  # on récupère les deux objectifs pour le pattern P2
+    if r1 != r2:  # on traite les objectifs de façon lexicographique :
+        return r1 < r2  # d'abord les valeurs du rang, et si celles-ci sont égales
+    return s1 < s2  # alors on prend en compte la valeur de la plus petite valeur singulière
+
+
+def recherche_locale_colonne(M, P_temp, col, candidats_colonnes, scores, num_modifications=3):
+    """
+    Applique une recherche locale sur les candidats de la LCR.
+    Modifie les colonnes en essayant d'obtenir une meilleure solution, en faisant 50 essais.
+    
+    Arguments :
+    - M : Matrice originale
+    - P_temp : Pattern temporaire
+    - col : Indice de la colonne à modifier
+    - candidats_colonnes : Liste des colonnes candidates
+    - scores : Scores associés (rang, val_sing)
+    - num_modifications : Nombre maximum d'inversions simultanées
+    
+    Retourne :
+    - meilleure_colonne : Colonne optimisée après la recherche locale
+    - meilleur_score : Score associé à la meilleure colonne
+    """
+    meilleur_score = min(scores, key=lambda x: (x[0], x[1]))  # Rang et val_sing minimaux initiaux
+    meilleure_colonne = candidats_colonnes[scores.index(meilleur_score)]
+    
+    for i, col_candidat in enumerate(candidats_colonnes):
+        for _ in range(50):  # Effectuer les 50 essais pour chaque colonne
+            candidat_modifié = col_candidat.copy()
+            indices_modif = np.random.choice(len(candidat_modifié), size=num_modifications, replace=False)
+            candidat_modifié[indices_modif] *= -1  # Inverser les coefficients sélectionnés
+            
+            P_temp[:, col] = candidat_modifié
+            rang, val_sing, _ = fobj(M[:, :col+1], P_temp[:, :col+1])
+            
+            # Comparer avec la meilleure solution trouvée
+            if rang < meilleur_score[0] or (rang == meilleur_score[0] and val_sing < meilleur_score[1]):
+                print(f"Amélioration trouvée : rang={rang}, val_sing={val_sing:.4f}")
+                meilleure_colonne = candidat_modifié
+                meilleur_score = (rang, val_sing)
+    
+    return meilleure_colonne, meilleur_score
+
+
+
+def grasp(M, X=2):
+    """
+    Implémente l'algorithme GRASP avec recherche locale sur les éléments de la LCR.
+    """
+    m, n = M.shape
+    num_candidats = 2 ** min(m, n) if min(m, n) < 17 else 100000
+    P = np.zeros((m, n), dtype=int)
+    rang_prec = 0
+    grasp_data = []  # Collecte des métriques pour le suivi
+
+    for col in range(n):
+        candidats_colonnes = []
+        scores = []
+        if_verif = True
+
+        for _ in range(num_candidats):
+            col_candidat = np.random.choice([-1, 1], size=m).astype(int)
+            P_temp = P.copy()
+            P_temp[:, col] = col_candidat
+            rang, val_sing, _ = fobj(M[:, :col+1], P_temp[:, :col+1])
+
+            if (rang - rang_prec) == 0:
+                print(f"YOUPIIII Colonne {col+1}/{n} :  rang = {rang}")
+                P[:, col] = col_candidat
+                rang_prec = rang
+                grasp_data.append((col, rang, val_sing))  # Collecte des métriques
+                if_verif = False
+                break
+            else:
+                candidats_colonnes.append(col_candidat)
+                scores.append((rang, val_sing))
+
+        if if_verif:
+            scores_sorted = sorted(zip(candidats_colonnes, scores), key=lambda x: (x[1][0], x[1][1]))
+            seuil = int(len(scores_sorted) * X / 100)
+            LCR = scores_sorted[:seuil]
+            candidats_LCR, scores_LCR = zip(*LCR)  # Séparer les colonnes et leurs scores
+
+            # Appliquer la recherche locale sur les éléments de la LCR
+            meilleure_colonne, meilleur_score = recherche_locale_colonne(
+                M, P.copy(), col, list(candidats_LCR), list(scores_LCR))
+
+            P[:, col] = meilleure_colonne
+            rang_prec = meilleur_score[0]
+            print(f"Bofff Colonne {col+1 }/{n} :  rang = {meilleur_score[0]}")
+            grasp_data.append((col, rang_prec, meilleur_score[1]))  # Collecte des métriques
+
+    return P, rang_prec, grasp_data
 
 
 def search_ligne_indep(matrice, pattern, Transposee =False):
@@ -317,9 +335,8 @@ if __name__ == "__main__":
         line_list = search_ligne_indep(M, new_best_pattern_line)
         # Tracer les métriques
         plot_search_line(search_line_data)
-       
-        
-        print("\nRésultat fobj {i} : \n", fobj(M, new_best_pattern_line)[0], fobj(M, new_best_pattern_line)[1])
+    
+        print(f"\nRésultat fobj {i} : \n", fobj(M, new_best_pattern_line)[0], fobj(M, new_best_pattern_line)[1])
         
     # Tracer les métriques
     plot_grasp(grasp_data)
