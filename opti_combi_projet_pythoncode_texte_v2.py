@@ -105,74 +105,46 @@ def construction_heuristique(M):
 
 
 def grasp(M, X=100):
-    """
-    Construit le pattern (matrice P) colonne par colonne, en gardant chaque colonne fixée après sa construction.
-    Sélection des X% meilleurs candidats en tenant compte du rang et de la plus petite valeur singulière.
-    
-    Arguments :
-    - M : Matrice de base à transformer
-    - num_candidats : Nombre de colonnes candidates générées à chaque itération
-    - X : Pourcentage pour sélectionner les meilleurs candidats (diversification)
-    
-    Retourne :
-    - P : Matrice pattern optimisée
-    """
     m, n = M.shape
     num_candidats = 2 ** min(m, n) if min(m, n) < 17 else 100000
-    P = np.zeros((m, n), dtype=int)  # Initialise une matrice vide pour construire progressivement
+    P = np.zeros((m, n), dtype=int)
     rang_prec = 0
-    
-    for col in range(n):
-        candidats_colonnes = []  # Liste pour stocker les colonnes candidates
-        scores = []  # Scores associés aux colonnes candidates (rang, val_sing)
-        if_verif= True
-        
-        # Générer plusieurs colonnes candidates
-        for _ in range(num_candidats):
-            col_candidat = np.random.choice([-1, 1], size=m).astype(int)  # Colonne aléatoire avec -1 et 1
-            P_temp = P.copy()
-            P_temp[:, col] = col_candidat  # Intégrer la colonne au pattern temporaire
-            rang, val_sing, _ = fobj(M[:,:col+1], P_temp[:,:col+1])  # Évaluer la fonction objectif
-            
-            
-            if (rang - rang_prec) == 0:
-                print(f"Youpi je suis passé avec -1 rang = {rang}")
+    grasp_data = []  # Pour collecter les métriques
 
+    for col in range(n):
+        candidats_colonnes = []
+        scores = []
+        if_verif = True
+
+        for _ in range(num_candidats):
+            col_candidat = np.random.choice([-1, 1], size=m).astype(int)
+            P_temp = P.copy()
+            P_temp[:, col] = col_candidat
+            rang, val_sing, _ = fobj(M[:, :col+1], P_temp[:, :col+1])
+
+            if (rang - rang_prec) == 0:
                 P[:, col] = col_candidat
                 rang_prec = rang
-                if_verif= False
+                grasp_data.append((col, rang, val_sing))  # Collecte des métriques
+                if_verif = False
                 break
-                
             else:
-                
                 candidats_colonnes.append(col_candidat)
-                scores.append((rang, val_sing))  # Stocker le rang et la plus petite valeur singulière
-                
-               
+                scores.append((rang, val_sing))
+
         if if_verif:
-            
-        
-            # Trier les candidats selon le rang, puis par la valeur singulière
             scores_sorted = sorted(zip(candidats_colonnes, scores), key=lambda x: (x[1][0], x[1][1]))
-    
-            # Étape 1 : Sélectionner les X% meilleurs candidats en fonction du rang et de la valeur singulière
-            seuil = int(len(scores_sorted) * X / 100)  # Calcul du nombre de meilleurs candidats à prendre
-            
-            LCR = scores_sorted[:seuil]  # Liste des X% meilleurs candidats
-            
-            rang_prec = rang
-            
-            # Étape 2 : Sélectionner un candidat de manière aléatoire parmi les X% meilleurs candidats
-            print(f"Colonne {col + 1}/{n} :  rang = {rang}")
-
-            #meilleure_colonne, _ = random.choice(LCR)
+            seuil = int(len(scores_sorted) * X / 100)
+            LCR = scores_sorted[:seuil]
             meilleure_colonne, _ = LCR[0]
-    
-            # Fixer la colonne sélectionnée
             P[:, col] = meilleure_colonne
+            rang_prec = rang
+            grasp_data.append((col, rang_prec, _[1]))  # Collecte des métriques
+
+    return P, rang_prec, grasp_data
 
 
-    return P,rang
+
 
 def search_ligne_indep(matrice, pattern, Transposee =False):
     if Transposee:
@@ -197,66 +169,91 @@ def search_ligne_indep(matrice, pattern, Transposee =False):
     return liste_index
 
 
-def use_search_line (M,P, line_list,rang,  X = 50):
+def use_search_line(M, P, line_list, rang, X=50):
     m, n = M.shape
-    num_candidats = 2 ** min(m, n) if min(m, n) < 17 else 100000  # Utiliser 1000 ou une autre valeur raisonnable comme limite
-
+    num_candidats = 2 ** min(m, n) if min(m, n) < 17 else 100000
     rang_prec = rang
     new_P = P.copy()
-    
-    for line in line_list:
-        candidats_lines = []  # Liste pour stocker les colonnes candidates
-        scores = []  # Scores associés aux colonnes candidates (rang, val_sing)
-        if_verif= True
-        
-        # Générer plusieurs colonnes candidates
-        for _ in range(num_candidats):
-            line_candidat = np.random.choice([-1, 1], size=n).astype(int)  # Colonne aléatoire avec -1 et 1
-            P_temp = new_P.copy()
-            P_temp[line, :] = line_candidat  # Intégrer la colonne au pattern temporaire
-            
-            rang, val_sing, _ = fobj(M, P_temp)  # Évaluer la fonction objectif
-            
-            
-            if (rang - rang_prec) < 0:
-                print(f"Line {line} YOUPIIII avec rang = {rang}")
+    search_line_data = []  # Collecte des métriques
 
+    for line in line_list:
+        candidats_lines = []
+        scores = []
+        if_verif = True
+
+        for _ in range(num_candidats):
+            line_candidat = np.random.choice([-1, 1], size=n).astype(int)
+            P_temp = new_P.copy()
+            P_temp[line, :] = line_candidat
+            rang, val_sing, _ = fobj(M, P_temp)
+
+            if (rang - rang_prec) < 0:
+                print(f"YOUPIIII Ligne {line }/{m} :  rang = {rang}")
                 new_P[line, :] = line_candidat
                 rang_prec = rang
-                candidats_lines = []
-                if_verif= False
+                search_line_data.append((line, rang, val_sing))  # Collecte des métriques
+                if_verif = False
                 break
-                
             else:
-                
                 candidats_lines.append(line_candidat)
-                scores.append((rang, val_sing))  # Stocker le rang et la plus petite valeur singulière
-                
-               
+                scores.append((rang, val_sing))
+
         if if_verif:
-            
-        
-            # Trier les candidats selon le rang, puis par la valeur singulière
             scores_sorted = sorted(zip(candidats_lines, scores), key=lambda x: (x[1][0], x[1][1]))
-    
-            # Étape 1 : Sélectionner les X% meilleurs candidats en fonction du rang et de la valeur singulière
-            seuil = int(len(scores_sorted) * X / 100)  # Calcul du nombre de meilleurs candidats à prendre
-            
-            LCR = scores_sorted[:seuil]  # Liste des X% meilleurs candidats
-            
-            rang_prec = rang
-            
-            # Étape 2 : Sélectionner un candidat de manière aléatoire parmi les X% meilleurs candidats
-            print(f"Ligne {line }/{m} :  rang = {rang}")
-
-            #meilleure_line, _ = random.choice(LCR)
+            seuil = int(len(scores_sorted) * X / 100)
+            LCR = scores_sorted[:seuil]
             meilleure_line, _ = LCR[0]
-    
-            # Fixer la ligne sélectionnée
+            rang_prec = rang
             new_P[line, :] = meilleure_line
+            print(f"Bofff Ligne {line }/{m} :  rang = {rang}")
+            search_line_data.append((line, rang, _[1]))  # Collecte des métriques
 
+    return new_P, search_line_data
 
-    return new_P
+import matplotlib.pyplot as plt
+
+def plot_grasp(grasp_data):
+    cols, rangs, val_sings = zip(*grasp_data)
+    plt.figure(figsize=(12, 6))
+    plt.subplot(1, 2, 1)
+    plt.plot(cols, rangs, marker='o', label='Rang')
+    plt.xlabel('Colonnes')
+    plt.ylabel('Rang')
+    plt.title('Évolution du Rang (GRASP)')
+    plt.grid()
+    plt.legend()
+
+    plt.subplot(1, 2, 2)
+    plt.plot(cols, val_sings, marker='o', color='orange', label='Valeur singulière')
+    plt.xlabel('Colonnes')
+    plt.ylabel('Dernière Valeur Singulière')
+    plt.title('Évolution de la Valeur Singulière (GRASP)')
+    plt.grid()
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+def plot_search_line(search_line_data):
+    lines, rangs, val_sings = zip(*search_line_data)
+    plt.figure(figsize=(12, 6))
+    plt.subplot(1, 2, 1)
+    plt.plot(lines, rangs, marker='o', label='Rang')
+    plt.xlabel('Lignes')
+    plt.ylabel('Rang')
+    plt.title('Évolution du Rang (Search Line)')
+    plt.grid()
+    plt.legend()
+
+    plt.subplot(1, 2, 2)
+    plt.plot(lines, val_sings, marker='o', color='orange', label='Valeur singulière')
+    plt.xlabel('Lignes')
+    plt.ylabel('Dernière Valeur Singulière')
+    plt.title('Évolution de la Valeur Singulière (Search Line)')
+    plt.grid()
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
 
 
 def lecture_fichier(path):
@@ -297,21 +294,21 @@ if __name__ == "__main__":
     start_time = time.time()
 
     # Générer la matrice ou lire depuis un fichier
-    M = random_matrix(m,n,r) # Exemple de matrice aléatoire
-    #M = lecture_fichier('correl5_matrice.txt')
+    #M = random_matrix(m,n,r) # Exemple de matrice aléatoire
+    M = lecture_fichier('correl5_matrice.txt')
     #M = lecture_fichier('exempleslide_matrice.txt')
 
-    # Exécuter l'algorithme métaheuristique
-    best_pattern , rang = grasp(M )
-    
+   
+    # Exécution des algorithmes
+    best_pattern, rang, grasp_data = grasp(M)
     line_list = search_ligne_indep(M, best_pattern)
-    
     print(f"This is the line liste : ", line_list)
+    new_best_pattern_line, search_line_data = use_search_line(M, best_pattern, line_list, rang)
     
-    #Appel de la fonction pour trouver le nouveau pattern en retravaillant sur les lignes
-    new_best_pattern_line = use_search_line(M, best_pattern, line_list, rang)
-    
-    
+    # Tracer les métriques
+    plot_grasp(grasp_data)
+    plot_search_line(search_line_data)
+
 
     # Mesurer le temps de fin
     end_time = time.time()
