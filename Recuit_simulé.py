@@ -50,7 +50,7 @@ def generate_new_pattern(P):
     # indices = np.random.randint(0, P.size, num_changes)
     # new_P.flat[indices] *= -1
     indice =np.random.randint(0, P.shape[1])
-    new_P= grasp.grasp(M,P,1000,indice=10)
+    new_P= grasp.graspP(M,P,indice,num_candidats=1000)
     return new_P
 
 
@@ -64,11 +64,10 @@ def construction_heuristique(M):
             P[i, i + 1] = 1
     return P
 
-
 # Métaheuristique pour optimiser le motif
 def metaheuristic(M, initial_temperature=100, cooling_rate=0.9, iterations_per_palier=100, final_temperature=1e-3):
     #P = construction_heuristique(M)
-    P = grasp.grasp(M,100000)
+    P = grasp.grasp(M,1000)
     current_rank, current_singular = fobj(M, P)
     best_P, best_rank, best_singular = P, current_rank, current_singular
     print(best_rank)
@@ -78,13 +77,14 @@ def metaheuristic(M, initial_temperature=100, cooling_rate=0.9, iterations_per_p
 
     while temperature > final_temperature:
         for _ in range(iterations_per_palier):
-            new_P = grasp.grasp(M,100000)
+            new_P = generate_new_pattern(P)
             new_rank, new_singular = fobj(M, new_P)
             #print(new_rank)
             # Critère d'acceptation
             if compareP1betterthanP2(M, new_P, P) or \
                     np.random.rand() < np.exp(-abs(new_rank - current_rank) / temperature):
                 P, current_rank, current_singular = new_P, new_rank, new_singular
+                print(current_rank)
                 
                 # Mise à jour du meilleur motif
                 if compareP1betterthanP2(M, P, best_P):
@@ -116,6 +116,7 @@ def lecture_fichier(path):
         data = [list(map(float, fin.readline().split())) for _ in range(m)]
     return np.array(data)
 
+
 # Exemple d'utilisation
 if __name__ == "__main__":
     M = lecture_fichier("correl5_matrice.txt")
@@ -135,3 +136,8 @@ if __name__ == "__main__":
     
     # Afficher les résultats
     print("\nTemps d'exécution : {:02d}h {:02d}m {:.2f}s".format(hours, minutes, seconds))
+    #%%
+# start_time = time.time()
+# P = grasp.grasp(M,100000)
+# print(fobj(M,P))
+# print(time.time()-start_time)

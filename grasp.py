@@ -111,7 +111,7 @@ def construction_heuristique(M):
     return P
 
 
-def grasp(M, num_candidats=10, X=10, indice = 0):
+def grasp(M, num_candidats=10, X=10):
     """
     Construit le pattern (matrice P) colonne par colonne, en gardant chaque colonne fixée après sa construction.
     Sélection des X% meilleurs candidats en tenant compte du rang et de la plus petite valeur singulière.
@@ -127,6 +127,56 @@ def grasp(M, num_candidats=10, X=10, indice = 0):
     m, n = M.shape
 
     P = np.zeros((m, n))  # Initialise une matrice vide pour construire progressivement
+
+    for col in range(n):
+        candidats_colonnes = []  # Liste pour stocker les colonnes candidates
+        scores = []  # Scores associés aux colonnes candidates (rang, val_sing)
+
+        # Générer plusieurs colonnes candidates
+        for _ in range(num_candidats):
+            col_candidat = np.random.choice([-1, 1], size=m)  # Colonne aléatoire avec -1 et 1
+            P_temp = P.copy()
+            P_temp[:, col] = col_candidat  # Intégrer la colonne au pattern temporaire
+            rang, val_sing, _ = fobj(M[:,:col+1], P_temp[:,:col+1])  # Évaluer la fonction objectif
+            candidats_colonnes.append(col_candidat)
+            scores.append((rang, val_sing))  # Stocker le rang et la plus petite valeur singulière
+
+        # Trier les candidats selon le rang, puis par la valeur singulière
+        scores_sorted = sorted(zip(candidats_colonnes, scores), key=lambda x: (x[1][0], x[1][1]))
+
+        # Étape 1 : Sélectionner les X% meilleurs candidats en fonction du rang et de la valeur singulière
+        seuil = int(len(scores_sorted) * X / 100)  # Calcul du nombre de meilleurs candidats à prendre
+        LCR = scores_sorted[:seuil]  # Liste des X% meilleurs candidats
+        
+        # Étape 2 : Sélectionner un candidat de manière aléatoire parmi les X% meilleurs candidats
+        #meilleure_colonne, _ = random.choice(LCR)
+        meilleure_colonne, _ = LCR[0]
+
+        # Fixer la colonne sélectionnée
+        P[:, col] = meilleure_colonne
+
+        # Afficher l'état intermédiaire pour le suivi
+        #•print(f"{col + 1}/{n} fixée : Rang minimal = {_[0]}, Val_sing = {_[1]}")
+
+    return P
+
+
+def graspP(M, P,indice,  num_candidats=10, X=10):
+    """
+    Construit le pattern (matrice P) colonne par colonne, en gardant chaque colonne fixée après sa construction.
+    Sélection des X% meilleurs candidats en tenant compte du rang et de la plus petite valeur singulière.
+    
+    Arguments :
+    - M : Matrice de base à transformer
+    - num_candidats : Nombre de colonnes candidates générées à chaque itération
+    - X : Pourcentage pour sélectionner les meilleurs candidats (diversification)
+    
+    Retourne :
+    - P : Matrice pattern optimisée
+    """
+    m, n = M.shape
+
+    #P = np.zeros((m, n))  # Initialise une matrice vide pour construire progressivement
 
     for col in range(indice,n):
         candidats_colonnes = []  # Liste pour stocker les colonnes candidates
@@ -159,6 +209,11 @@ def grasp(M, num_candidats=10, X=10, indice = 0):
         #•print(f"{col + 1}/{n} fixée : Rang minimal = {_[0]}, Val_sing = {_[1]}")
 
     return P
+
+
+
+
+
 
 
 def lecture_fichier(path):
