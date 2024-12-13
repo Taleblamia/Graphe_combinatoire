@@ -1,5 +1,7 @@
 
 import numpy as np
+import random
+
 
 def matrices1_ledm(n):
   M  = np.zeros((n,n))
@@ -90,7 +92,7 @@ def recherche_locale_guidée(M, P, max_voisins=100):
 
     return meilleur_P
 
-import random
+
 
 def construction_heuristique(M):
     m, n = M.shape
@@ -123,6 +125,7 @@ def grasp(M, X=100):
             rang, val_sing, _ = fobj(M[:, :col+1], P_temp[:, :col+1])
 
             if (rang - rang_prec) == 0:
+                print(f"YOUPIIII Colonne {col+1}/{n} :  rang = {rang}")
                 P[:, col] = col_candidat
                 rang_prec = rang
                 grasp_data.append((col, rang, val_sing))  # Collecte des métriques
@@ -138,7 +141,8 @@ def grasp(M, X=100):
             LCR = scores_sorted[:seuil]
             meilleure_colonne, _ = LCR[0]
             P[:, col] = meilleure_colonne
-            rang_prec = rang
+            rang_prec = _[0]
+            print(f"Bofff Colonne {col+1 }/{n} :  rang = { _[0]}")
             grasp_data.append((col, rang_prec, _[1]))  # Collecte des métriques
 
     return P, rang_prec, grasp_data
@@ -203,12 +207,15 @@ def use_search_line(M, P, line_list, rang, X=50):
             seuil = int(len(scores_sorted) * X / 100)
             LCR = scores_sorted[:seuil]
             meilleure_line, _ = LCR[0]
-            rang_prec = rang
+            
             new_P[line, :] = meilleure_line
-            print(f"Bofff Ligne {line }/{m} :  rang = {rang}")
-            search_line_data.append((line, rang, _[1]))  # Collecte des métriques
+            #new_P[line, :] = P[line, :].copy()
+            #rang, val_sing, _ = fobj(M, new_P)
+            rang_prec = _[0]
+            print(f"Bofff Ligne {line }/{m} :  rang = {_[0]}")
+            search_line_data.append((line, rang_prec, _[1]))  # Collecte des métriques
 
-    return new_P, search_line_data
+    return new_P, search_line_data, rang
 
 import matplotlib.pyplot as plt
 
@@ -297,17 +304,26 @@ if __name__ == "__main__":
     #M = random_matrix(m,n,r) # Exemple de matrice aléatoire
     M = lecture_fichier('correl5_matrice.txt')
     #M = lecture_fichier('exempleslide_matrice.txt')
-
    
     # Exécution des algorithmes
     best_pattern, rang, grasp_data = grasp(M)
     line_list = search_ligne_indep(M, best_pattern)
     print(f"This is the line liste : ", line_list)
-    new_best_pattern_line, search_line_data = use_search_line(M, best_pattern, line_list, rang)
+    new_best_pattern_line, search_line_data, new_rang = use_search_line(M, best_pattern, line_list, rang)
     
+    for i in range(5):
+        print(f"This is the line liste : ", line_list)
+        new_best_pattern_line, search_line_data, new_rang = use_search_line(M, new_best_pattern_line, line_list, new_rang)
+        line_list = search_ligne_indep(M, new_best_pattern_line)
+        # Tracer les métriques
+        plot_search_line(search_line_data)
+       
+        
+        print("\nRésultat fobj {i} : \n", fobj(M, new_best_pattern_line)[0], fobj(M, new_best_pattern_line)[1])
+        
     # Tracer les métriques
     plot_grasp(grasp_data)
-    plot_search_line(search_line_data)
+    
 
 
     # Mesurer le temps de fin
