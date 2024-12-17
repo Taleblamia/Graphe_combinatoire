@@ -1,45 +1,7 @@
+"""
+Groupe 6
 
-def grasp(M, X=100):
-    m, n = M.shape
-    num_candidats = 2 ** min(m, n) if min(m, n) < 17 else 100000
-    P = np.zeros((m, n), dtype=int)
-    rang_prec = 0
-    grasp_data = []  # Pour collecter les métriques
-
-    for col in range(n):
-        candidats_colonnes = []
-        scores = []
-        if_verif = True
-
-        for _ in range(num_candidats):
-            col_candidat = np.random.choice([-1, 1], size=m).astype(int)
-            P_temp = P.copy()
-            P_temp[:, col] = col_candidat
-            rang, val_sing, _ = fobj(M[:, :col+1], P_temp[:, :col+1])
-
-            if (rang - rang_prec) == 0:
-                print(f"YOUPIIII Colonne {col+1}/{n} :  rang = {rang}")
-                P[:, col] = col_candidat
-                rang_prec = rang
-                grasp_data.append((col, rang, val_sing))  # Collecte des métriques
-                if_verif = False
-                break
-            else:
-                candidats_colonnes.append(col_candidat)
-                scores.append((rang, val_sing))
-
-        if if_verif:
-            scores_sorted = sorted(zip(candidats_colonnes, scores), key=lambda x: (x[1][0], x[1][1]))
-            seuil = int(len(scores_sorted) * X / 100)
-            LCR = scores_sorted[:seuil]
-            meilleure_colonne, _ = LCR[0]
-            P[:, col] = meilleure_colonne
-            rang_prec = _[0]
-            print(f"Bofff Colonne {col+1 }/{n} :  rang = { _[0]}")
-            grasp_data.append((col, rang_prec, _[1]))  # Collecte des métriques
-
-    return P, rang_prec, grasp_data
-#%%
+"""
 import numpy as np
 import random
 
@@ -79,7 +41,7 @@ def compareP1betterthanP2(M, P1, P2):
     return s1 < s2  # alors on prend en compte la valeur de la plus petite valeur singulière
 
 
-def recherche_locale_colonne(M, P_temp, col, candidats_colonnes, scores, num_modifications=3):
+def recherche_locale_colonne(M, P_temp, col, candidats_colonnes, scores, num_modifications=2):
     """
     Applique une recherche locale sur les candidats de la LCR.
     Modifie les colonnes en essayant d'obtenir une meilleure solution, en faisant X essais.
@@ -100,7 +62,7 @@ def recherche_locale_colonne(M, P_temp, col, candidats_colonnes, scores, num_mod
     meilleure_colonne = candidats_colonnes[scores.index(meilleur_score)]
     
     for i, col_candidat in enumerate(candidats_colonnes):
-        for _ in range(50):  # Effectuer les 50 essais pour chaque colonne
+        for _ in range(100):  # Effectuer les 50 essais pour chaque colonne
             candidat_modifié = col_candidat.copy()
             indices_modif = np.random.choice(len(candidat_modifié), size=num_modifications, replace=False)
             candidat_modifié[indices_modif] *= -1  # Inverser les coefficients sélectionnés
@@ -119,7 +81,7 @@ def recherche_locale_colonne(M, P_temp, col, candidats_colonnes, scores, num_mod
 def recherche_locale_ligne(M, P_temp, line, candidats_lines, scores, num_modifications):
     """
     Applique une recherche locale sur les candidats de la LCR (pour une ligne donnée).
-    Modifie les lignes en essayant d'obtenir une meilleure solution, en faisant 50 essais.
+    Modifie les lignes en essayant d'obtenir une meilleure solution, en faisant X essais.
 
     Arguments :
     - M : Matrice originale
@@ -135,9 +97,10 @@ def recherche_locale_ligne(M, P_temp, line, candidats_lines, scores, num_modific
     """
     meilleur_score = min(scores, key=lambda x: (x[0], x[1]))  # Rang et val_sing minimaux initiaux
     meilleure_line = candidats_lines[scores.index(meilleur_score)]
-
+    amelioration = False
     for i, line_candidat in enumerate(candidats_lines):
-        for _ in range(30):  # Effectuer les 50 essais pour chaque ligne
+        for _ in range(50):  # Effectuer les 50 essais pour chaque ligne
+            
             candidat_modifié = line_candidat.copy()
             indices_modif = np.random.choice(len(candidat_modifié), size=num_modifications, replace=False)
             candidat_modifié[indices_modif] *= -1  # Inverser les coefficients sélectionnés
@@ -150,8 +113,9 @@ def recherche_locale_ligne(M, P_temp, line, candidats_lines, scores, num_modific
                 print(f"Amélioration {line} : rang={rang}, val_sing={val_sing:.4f}")
                 meilleure_line = candidat_modifié
                 meilleur_score = (rang, val_sing)
+                amelioration = True
 
-    return meilleure_line, meilleur_score
+    return meilleure_line, meilleur_score, amelioration
 
 
 def grasp(M, X=2):
@@ -159,33 +123,40 @@ def grasp(M, X=2):
     Implémente l'algorithme GRASP avec recherche locale sur les éléments de la LCR.
     """
     m, n = M.shape
-    num_candidats = 2 ** min(m, n) if min(m, n) < 17 else 200000
+    num_candidats = 2 ** min(m, n) if min(m, n) < 20 else 100000
     P = np.zeros((m, n), dtype=int)
     rang_prec = 0
     grasp_data = []  # Collecte des métriques pour le suivi
 
     for col in range(n):
+        candidats_colonnes_set = set()
         candidats_colonnes = []
         scores = []
-        if_verif = True
 
         for _ in range(num_candidats):
             col_candidat = np.random.choice([-1, 1], size=m).astype(int)
-            P_temp = P.copy()
-            P_temp[:, col] = col_candidat
-            rang, val_sing, _ = fobj(M[:, :col+1], P_temp[:, :col+1])
-
-            if (rang - rang_prec) == 0:
-                print(f"YOUPIIII Colonne {col+1}/{n} :  rang = {rang}")
-                P[:, col] = col_candidat
-                rang_prec = rang
-                grasp_data.append((col, rang, val_sing))  # Collecte des métriques
-                if_verif = False
-                break
-            else:
-                candidats_colonnes.append(col_candidat)
-                scores.append((rang, val_sing))
-
+            col_tuple = tuple(col_candidat)
+            if  col_tuple not in candidats_colonnes_set:
+                if_verif = True
+                P_temp = P.copy()
+                P_temp[:, col] = col_candidat
+                rang, val_sing, _ = fobj(M[:, :col+1], P_temp[:, :col+1])
+    
+                if (rang - rang_prec) == 0:
+                    print(f"YOUPIIII Colonne {col+1}/{n} :  rang = {rang}")
+                    P[:, col] = col_candidat
+                    rang_prec = rang
+                    grasp_data.append((col, rang, val_sing))  # Collecte des métriques
+                    if_verif = False
+                    break
+                else:
+                    candidats_colonnes.append(col_candidat)
+                    candidats_colonnes_set.add(col_tuple)
+                    scores.append((rang, val_sing))
+            else: 
+                num_candidats +=1
+            
+            
         if if_verif:
             scores_sorted = sorted(zip(candidats_colonnes, scores), key=lambda x: (x[1][0], x[1][1]))
             seuil = int(len(scores_sorted) * X / 100)
@@ -227,7 +198,7 @@ def search_ligne_indep(matrice, pattern, Transposee =False):
     return liste_index
 
 
-def use_search_line(M, P, line_list, rang, X=1, num_modifications=2):
+def use_search_line(M, P, line_list, rang, X=1, num_modifications=3):
     """
     Optimise les lignes indépendantes identifiées dans `line_list` avec recherche locale.
 
@@ -245,53 +216,63 @@ def use_search_line(M, P, line_list, rang, X=1, num_modifications=2):
     - rang_prec : Rang final après optimisation
     """
     m, n = M.shape
-    num_candidats = 2 ** min(m, n) if min(m, n) < 17 else 100000
+    num_candidats = 2 ** min(m, n) if min(m, n) < 15 else 50000
     rang_prec = rang
     new_P = P.copy()
     search_line_data = []  # Collecte des métriques
+    amelioration = False
+    
+    if len(line_list):
+        for line in line_list:
+            candidats_lines_set = set()
+            candidats_lines = []
+            scores = []
+            
+            # Générer plusieurs lignes candidates
+            for _ in range(num_candidats):
+                line_candidat = np.random.choice([-1, 1], size=n).astype(int)
+                line_tuple = tuple(line_candidat)
+                
+                if  line_tuple not in candidats_lines_set:
+                    if_verif = True
+                    P_temp = new_P.copy()
+                    P_temp[line, :] = line_candidat
+                    rang, val_sing, _ = fobj(M, P_temp)
+        
+                    if rang < rang_prec:
+                        print(f"YOUPIIII Ligne {line}/{m} : rang = {rang}")
+                        new_P[line, :] = line_candidat
+                        rang_prec = rang
+                        search_line_data.append((line, rang, val_sing))
+                        if_verif = False
+                        amelioration = True
+                        break
+                    else:
+                        candidats_lines.append(line_candidat)
+                        candidats_lines_set.add(line_tuple)
+                        scores.append((rang, val_sing))
+                else: 
+                    num_candidats +=1
+    
+            if if_verif:
+                # Trier les candidats selon le rang, puis par la valeur singulière
+                scores_sorted = sorted(zip(candidats_lines, scores), key=lambda x: (x[1][0], x[1][1]))
+                seuil = int(len(scores_sorted) * X / 100)
+                LCR = scores_sorted[:seuil]
+    
+                # Recherche locale sur les candidats de la LCR
+                P_temp = new_P.copy()
+                meilleure_line, meilleur_score, amelioration = recherche_locale_ligne(
+                    M, P_temp, line, [x[0] for x in LCR], [x[1] for x in LCR], num_modifications
+                )
+    
+                # Appliquer la meilleure ligne trouvée
+                new_P[line, :] = meilleure_line
+                rang_prec = meilleur_score[0]
+                print(f"Ligne {line}/{m} après recherche locale : rang = {rang_prec}")
+                search_line_data.append((line, rang_prec, meilleur_score[1]))
 
-    for line in line_list:
-        candidats_lines = []
-        scores = []
-        if_verif = True
-
-        # Générer plusieurs lignes candidates
-        for _ in range(num_candidats):
-            line_candidat = np.random.choice([-1, 1], size=n).astype(int)
-            P_temp = new_P.copy()
-            P_temp[line, :] = line_candidat
-            rang, val_sing, _ = fobj(M, P_temp)
-
-            if rang < rang_prec:
-                print(f"YOUPIIII Ligne {line}/{m} : rang = {rang}")
-                new_P[line, :] = line_candidat
-                rang_prec = rang
-                search_line_data.append((line, rang, val_sing))
-                if_verif = False
-                break
-            else:
-                candidats_lines.append(line_candidat)
-                scores.append((rang, val_sing))
-
-        if if_verif:
-            # Trier les candidats selon le rang, puis par la valeur singulière
-            scores_sorted = sorted(zip(candidats_lines, scores), key=lambda x: (x[1][0], x[1][1]))
-            seuil = int(len(scores_sorted) * X / 100)
-            LCR = scores_sorted[:seuil]
-
-            # Recherche locale sur les candidats de la LCR
-            P_temp = new_P.copy()
-            meilleure_line, meilleur_score = recherche_locale_ligne(
-                M, P_temp, line, [x[0] for x in LCR], [x[1] for x in LCR], num_modifications
-            )
-
-            # Appliquer la meilleure ligne trouvée
-            new_P[line, :] = meilleure_line
-            rang_prec = meilleur_score[0]
-            print(f"Ligne {line}/{m} après recherche locale : rang = {rang_prec}")
-            search_line_data.append((line, rang_prec, meilleur_score[1]))
-
-    return new_P, search_line_data, rang_prec
+    return new_P, search_line_data, rang_prec, amelioration
 
 
 import matplotlib.pyplot as plt
@@ -381,17 +362,27 @@ if __name__ == "__main__":
     #M = random_matrix(m,n,r) # Exemple de matrice aléatoire
     M = lecture_fichier('correl5_matrice.txt')
     #M = lecture_fichier('exempleslide_matrice.txt')
+    #M = matrices1_ledm(20)
+    #M = lecture_fichier('120.txt')
    
     # Exécution des algorithmes
     best_pattern, rang, grasp_data = grasp(M)
     line_list = search_ligne_indep(M, best_pattern)
     print(f"This is the line liste : ", line_list)
-    new_best_pattern_line, search_line_data, new_rang = use_search_line(M, best_pattern, line_list, rang)
+    new_best_pattern_line, search_line_data, new_rang, amelioration = use_search_line(M, best_pattern, line_list, rang)
     
-    for i in range(5):
-        print(f"This is the line liste : ", line_list)
-        new_best_pattern_line, search_line_data, new_rang = use_search_line(M, new_best_pattern_line, line_list, new_rang)
+    for i in range(3):
+        line_list_prec = line_list.copy()
+        print(f"\nItération {i+1} : Liste des lignes indépendantes : {line_list}")
+        new_best_pattern_line, search_line_data, new_rang, amelioration = use_search_line(M, new_best_pattern_line, line_list, new_rang)
+        
+        # Recalculer les lignes indépendantes
         line_list = search_ligne_indep(M, new_best_pattern_line)
+        
+        # Vérifier si l'état des lignes n'a pas changé
+        if not amelioration:
+            print("Aucune amélioration supplémentaire trouvée. Arrêt de la boucle.")
+            break
         # Tracer les métriques
         plot_search_line(search_line_data)
     
