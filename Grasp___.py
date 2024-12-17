@@ -82,7 +82,7 @@ def compareP1betterthanP2(M, P1, P2):
 def recherche_locale_colonne(M, P_temp, col, candidats_colonnes, scores, num_modifications=3):
     """
     Applique une recherche locale sur les candidats de la LCR.
-    Modifie les colonnes en essayant d'obtenir une meilleure solution, en faisant 50 essais.
+    Modifie les colonnes en essayant d'obtenir une meilleure solution, en faisant X essais.
     
     Arguments :
     - M : Matrice originale
@@ -110,12 +110,48 @@ def recherche_locale_colonne(M, P_temp, col, candidats_colonnes, scores, num_mod
             
             # Comparer avec la meilleure solution trouvée
             if rang < meilleur_score[0] or (rang == meilleur_score[0] and val_sing < meilleur_score[1]):
-                print(f"Amélioration trouvée : rang={rang}, val_sing={val_sing:.4f}")
+                print(f"Collone {col+1} : Amélioration: rang={rang}, val_sing={val_sing:.4f}")
                 meilleure_colonne = candidat_modifié
                 meilleur_score = (rang, val_sing)
     
     return meilleure_colonne, meilleur_score
 
+def recherche_locale_ligne(M, P_temp, line, candidats_lines, scores, num_modifications):
+    """
+    Applique une recherche locale sur les candidats de la LCR (pour une ligne donnée).
+    Modifie les lignes en essayant d'obtenir une meilleure solution, en faisant 50 essais.
+
+    Arguments :
+    - M : Matrice originale
+    - P_temp : Pattern temporaire
+    - line : Indice de la ligne à modifier
+    - candidats_lines : Liste des lignes candidates
+    - scores : Scores associés (rang, val_sing)
+    - num_modifications : Nombre maximum d'inversions simultanées
+
+    Retourne :
+    - meilleure_line : Ligne optimisée après la recherche locale
+    - meilleur_score : Score associé à la meilleure ligne
+    """
+    meilleur_score = min(scores, key=lambda x: (x[0], x[1]))  # Rang et val_sing minimaux initiaux
+    meilleure_line = candidats_lines[scores.index(meilleur_score)]
+
+    for i, line_candidat in enumerate(candidats_lines):
+        for _ in range(30):  # Effectuer les 50 essais pour chaque ligne
+            candidat_modifié = line_candidat.copy()
+            indices_modif = np.random.choice(len(candidat_modifié), size=num_modifications, replace=False)
+            candidat_modifié[indices_modif] *= -1  # Inverser les coefficients sélectionnés
+
+            P_temp[line, :] = candidat_modifié
+            rang, val_sing, _ = fobj(M, P_temp)
+
+            # Comparer avec la meilleure solution trouvée
+            if rang < meilleur_score[0] or (rang == meilleur_score[0] and val_sing < meilleur_score[1]):
+                print(f"Amélioration {line} : rang={rang}, val_sing={val_sing:.4f}")
+                meilleure_line = candidat_modifié
+                meilleur_score = (rang, val_sing)
+
+    return meilleure_line, meilleur_score
 
 
 def grasp(M, X=2):
@@ -123,7 +159,7 @@ def grasp(M, X=2):
     Implémente l'algorithme GRASP avec recherche locale sur les éléments de la LCR.
     """
     m, n = M.shape
-    num_candidats = 2 ** min(m, n) if min(m, n) < 17 else 100000
+    num_candidats = 2 ** min(m, n) if min(m, n) < 17 else 200000
     P = np.zeros((m, n), dtype=int)
     rang_prec = 0
     grasp_data = []  # Collecte des métriques pour le suivi
@@ -162,7 +198,7 @@ def grasp(M, X=2):
 
             P[:, col] = meilleure_colonne
             rang_prec = meilleur_score[0]
-            print(f"Bofff Colonne {col+1 }/{n} :  rang = {meilleur_score[0]}")
+            print(f" Colonne {col+1 }/{n} :  rang = {meilleur_score[0]}")
             grasp_data.append((col, rang_prec, meilleur_score[1]))  # Collecte des métriques
 
     return P, rang_prec, grasp_data
@@ -191,7 +227,23 @@ def search_ligne_indep(matrice, pattern, Transposee =False):
     return liste_index
 
 
-def use_search_line(M, P, line_list, rang, X=50):
+def use_search_line(M, P, line_list, rang, X=1, num_modifications=2):
+    """
+    Optimise les lignes indépendantes identifiées dans `line_list` avec recherche locale.
+
+    Arguments :
+    - M : Matrice originale
+    - P : Pattern actuel
+    - line_list : Liste des indices des lignes à optimiser
+    - rang : Rang initial de la matrice
+    - X : Pourcentage pour sélectionner les meilleurs candidats (diversification)
+    - num_modifications : Nombre maximum d'inversions simultanées pour la recherche locale
+
+    Retourne :
+    - new_P : Nouveau pattern après optimisation
+    - search_line_data : Données collectées pour suivi des métriques
+    - rang_prec : Rang final après optimisation
+    """
     m, n = M.shape
     num_candidats = 2 ** min(m, n) if min(m, n) < 17 else 100000
     rang_prec = rang
@@ -203,17 +255,18 @@ def use_search_line(M, P, line_list, rang, X=50):
         scores = []
         if_verif = True
 
+        # Générer plusieurs lignes candidates
         for _ in range(num_candidats):
             line_candidat = np.random.choice([-1, 1], size=n).astype(int)
             P_temp = new_P.copy()
             P_temp[line, :] = line_candidat
             rang, val_sing, _ = fobj(M, P_temp)
 
-            if (rang - rang_prec) < 0:
-                print(f"YOUPIIII Ligne {line }/{m} :  rang = {rang}")
+            if rang < rang_prec:
+                print(f"YOUPIIII Ligne {line}/{m} : rang = {rang}")
                 new_P[line, :] = line_candidat
                 rang_prec = rang
-                search_line_data.append((line, rang, val_sing))  # Collecte des métriques
+                search_line_data.append((line, rang, val_sing))
                 if_verif = False
                 break
             else:
@@ -221,19 +274,25 @@ def use_search_line(M, P, line_list, rang, X=50):
                 scores.append((rang, val_sing))
 
         if if_verif:
+            # Trier les candidats selon le rang, puis par la valeur singulière
             scores_sorted = sorted(zip(candidats_lines, scores), key=lambda x: (x[1][0], x[1][1]))
             seuil = int(len(scores_sorted) * X / 100)
             LCR = scores_sorted[:seuil]
-            meilleure_line, _ = LCR[0]
-            
-            new_P[line, :] = meilleure_line
-            #new_P[line, :] = P[line, :].copy()
-            #rang, val_sing, _ = fobj(M, new_P)
-            rang_prec = _[0]
-            print(f"Bofff Ligne {line }/{m} :  rang = {_[0]}")
-            search_line_data.append((line, rang_prec, _[1]))  # Collecte des métriques
 
-    return new_P, search_line_data, rang
+            # Recherche locale sur les candidats de la LCR
+            P_temp = new_P.copy()
+            meilleure_line, meilleur_score = recherche_locale_ligne(
+                M, P_temp, line, [x[0] for x in LCR], [x[1] for x in LCR], num_modifications
+            )
+
+            # Appliquer la meilleure ligne trouvée
+            new_P[line, :] = meilleure_line
+            rang_prec = meilleur_score[0]
+            print(f"Ligne {line}/{m} après recherche locale : rang = {rang_prec}")
+            search_line_data.append((line, rang_prec, meilleur_score[1]))
+
+    return new_P, search_line_data, rang_prec
+
 
 import matplotlib.pyplot as plt
 
