@@ -104,7 +104,6 @@ def recherche_locale_ligne(M, P_temp, line, candidats_lines, scores, num_modific
             candidat_modifié = line_candidat.copy()
             indices_modif = np.random.choice(len(candidat_modifié), size=num_modifications, replace=False)
             candidat_modifié[indices_modif] *= -1  # Inverser les coefficients sélectionnés
-            print(candidat_modifié)
 
             P_temp[line, :] = candidat_modifié
             rang, val_sing, _ = fobj(M, P_temp)
@@ -124,7 +123,7 @@ def grasp(M, X=2):
     Implémente l'algorithme GRASP avec recherche locale sur les éléments de la LCR.
     """
     m, n = M.shape
-    num_candidats = 2 ** min(m, n) if min(m, n) < 20 else 100000
+    num_candidats = 2 ** min(m, n) if min(m, n) < 10 else 1000
     P = np.zeros((m, n), dtype=int)
     rang_prec = 0
     grasp_data = []  # Collecte des métriques pour le suivi
@@ -189,10 +188,16 @@ def diversification_grasp(matrice, pattern):
 
     while num_candidats>0:
         col_candidat =  [] 
+        col_pour_set = []
         
-        for col in col_modif:
+        for i, col in enumerate(col_modif):
             col_candidat.append(np.random.choice([-1, 1], size = min(m,n)).astype(int))
-        col_tuple = tuple(col_candidat)
+            if len(col_pour_set) != 0:
+                col_pour_set = col_pour_set + col_candidat[i]
+            else:
+                col_pour_set = col_candidat[i]
+        
+        col_tuple = tuple(col_pour_set)
         
         if col_tuple not in candidats_colonnes_set:
             num_candidats = num_candidats - 1
@@ -258,7 +263,7 @@ def use_search_line(M, P, line_list, rang, X=1, num_modifications=3):
     - rang_prec : Rang final après optimisation
     """
     m, n = M.shape
-    num_candidats = 2 ** min(m, n) if min(m, n) < 15 else 50000
+    num_candidats = 2 ** min(m, n) if min(m, n) < 10 else 1000
     rang_prec = rang
     new_P = P.copy()
     search_line_data = []  # Collecte des métriques
@@ -439,10 +444,15 @@ if __name__ == "__main__":
         final_rank = new_rang
     
         
-    for _ in range(10):
+    for _ in range(100):
         
         print('Diversification...')
-        new_pattern, cond = diversification_grasp(M, final_pattern)
+        new_pattern, best_rank, cond = diversification_grasp(M, final_pattern)
+        
+        if new_rang<final_rank:
+            final_pattern = new_best_pattern_line.copy()
+            final_rank = new_rang
+            print("yes")
             
         if cond:
             line_list = search_ligne_indep(M, best_pattern)
