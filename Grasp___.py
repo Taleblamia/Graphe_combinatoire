@@ -104,6 +104,7 @@ def recherche_locale_ligne(M, P_temp, line, candidats_lines, scores, num_modific
             candidat_modifié = line_candidat.copy()
             indices_modif = np.random.choice(len(candidat_modifié), size=num_modifications, replace=False)
             candidat_modifié[indices_modif] *= -1  # Inverser les coefficients sélectionnés
+            print(candidat_modifié)
 
             P_temp[line, :] = candidat_modifié
             rang, val_sing, _ = fobj(M, P_temp)
@@ -123,7 +124,7 @@ def grasp(M, X=2):
     Implémente l'algorithme GRASP avec recherche locale sur les éléments de la LCR.
     """
     m, n = M.shape
-    num_candidats = 2 ** min(m, n) if min(m, n) < 20 else 100000
+    num_candidats = 2 ** min(m, n) if min(m, n) < 20 else 1000
     P = np.zeros((m, n), dtype=int)
     rang_prec = 0
     grasp_data = []  # Collecte des métriques pour le suivi
@@ -174,6 +175,62 @@ def grasp(M, X=2):
 
     return P, rang_prec, grasp_data
 
+
+def diversification_grasp(matrice, pattern, best_rank):
+    
+    m, n = M.shape
+    num_modifications = np.random.choice(max(m,n))
+    col_modif = np.random.choice(max(m,n), size=num_modifications, replace=False)
+    num_candidats = 2 ** min(m, n) if min(m, n) < 20 else 1000
+    P = np.zeros((m, n), dtype=int)
+    rang_prec = 0
+    grasp_data = []  # Collecte des métriques pour le suivi
+
+    for col in col_modif:
+        candidats_colonnes_set = set()
+        candidats_colonnes = []
+        scores = []
+
+        for _ in range(num_candidats):
+            col_candidat = np.random.choice([-1, 1], size=m).astype(int)
+            col_tuple = tuple(col_candidat)
+            if  col_tuple not in candidats_colonnes_set:
+                if_verif = True
+                P_temp = P.copy()
+                P_temp[:, col] = col_candidat
+                rang, val_sing, _ = fobj(M[:, :col+1], P_temp[:, :col+1])
+    
+                if (rang - rang_prec) == 0:
+                    print(f"YOUPIIII Colonne {col+1}/{n} :  rang = {rang}")
+                    P[:, col] = col_candidat
+                    rang_prec = rang
+                    grasp_data.append((col, rang, val_sing))  # Collecte des métriques
+                    if_verif = False
+                    break
+                else:
+                    candidats_colonnes.append(col_candidat)
+                    candidats_colonnes_set.add(col_tuple)
+                    scores.append((rang, val_sing))
+            else: 
+                num_candidats +=1
+            
+            
+        if if_verif:
+            scores_sorted = sorted(zip(candidats_colonnes, scores), key=lambda x: (x[1][0], x[1][1]))
+            seuil = int(len(scores_sorted) * X / 100)
+            LCR = scores_sorted[:seuil]
+            candidats_LCR, scores_LCR = zip(*LCR)  # Séparer les colonnes et leurs scores
+
+            # Appliquer la recherche locale sur les éléments de la LCR
+            meilleure_colonne, meilleur_score = recherche_locale_colonne(
+                M, P.copy(), col, list(candidats_LCR), list(scores_LCR))
+
+            P[:, col] = meilleure_colonne
+            rang_prec = meilleur_score[0]
+            print(f" Colonne {col+1 }/{n} :  rang = {meilleur_score[0]}")
+            grasp_data.append((col, rang_prec, meilleur_score[1]))  # Collecte des métriques
+
+    
 
 def search_ligne_indep(matrice, pattern, Transposee =False):
     if Transposee:
