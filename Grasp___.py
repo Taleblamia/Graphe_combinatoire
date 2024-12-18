@@ -134,11 +134,10 @@ def grasp(M, X=2):
         candidats_colonnes = []
         scores = []
 
-        while num_candidats>0:
+        for _ in range(num_candidats):
             col_candidat = np.random.choice([-1, 1], size=m).astype(int)
             col_tuple = tuple(col_candidat)
             if  col_tuple not in candidats_colonnes_set:
-                num_candidats = num_candidats - 1
                 if_verif = True
                 P_temp = P.copy()
                 P_temp[:, col] = col_candidat
