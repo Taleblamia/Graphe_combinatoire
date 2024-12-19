@@ -9,6 +9,8 @@ Original file is located at
 
 import numpy as np
 from scipy.linalg import circulant
+import matplotlib.pyplot as plt
+import time
 #%%
 def matrices1_ledm(n):
     M = np.zeros((n, n))
@@ -37,39 +39,17 @@ def fobj(M, P, tol=1e-14):
 def calculate_rank(P, M):
     """Calcule le rang de la matrice P ∘ M."""
     return np.linalg.matrix_rank(P * M)
-#%%
-def generate_neighbors(P, neighborhood, num_neighbors=1000):
-    """Génère des voisins à partir de la solution actuelle P."""
-    neighbors = []
-    m, n = P.shape
-
-    for _ in range(num_neighbors):
-        P_new = P.copy()
-
-        if neighborhood == 1:  # Modifier un seul élément
-            i, j = np.random.randint(0, m), np.random.randint(0, n)
-            P_new[i, j] *= -1
-
-        elif neighborhood == 2:  # Modifier une ligne complète
-            i = np.random.randint(0, m)
-            P_new[i, :] *= -1
-
-        elif neighborhood == 3:  # Modifier une colonne complète
-            j = np.random.randint(0, n)
-            P_new[:, j] *= -1
-
-        elif neighborhood == 4:  # Modifier plusieurs éléments aléatoires
-            num_changes = np.random.randint(1, m * n // 4)  # Modifier jusqu'à 25% des éléments
-            for _ in range(num_changes):
-                i, j = np.random.randint(0, m), np.random.randint(0, n)
-                P_new[i, j] *= -1
-
-        neighbors.append(P_new)
-
-    return neighbors
-
-
-
+def lecture_fichier(path):
+    with open(path, 'r') as fin:  # ouverture du fichier en mode lecture
+        m, n = map(int, fin.readline().rstrip().split())  # lecture des dimensions m et n
+        data = []  # initialisation d'une liste pour stocker les matrices
+        
+        # Lecture des lignes suivantes contenant les éléments de la matrice
+        for _ in range(m):
+            ligne = list(map(float, fin.readline().rstrip().split()))  
+            data.append(ligne)  
+        
+    return np.array(data)
 #%%
 def compareP1betterthanP2(M, P1, P2):
     r1, s1 = fobj(M, P1)  # Objectifs pour P1
@@ -78,33 +58,160 @@ def compareP1betterthanP2(M, P1, P2):
         return r1 < r2    # Priorité au rang
     return s1 < s2        # Ensuite à la plus petite valeur singulière
 
-def metaheuristic(M, max_iter=100, tabu_size=10):
-    """Recherche à voisinage variable pour minimiser le rang de P ∘ M."""
+
+def generate_neighbors(P, neighborhood, num_neighbors=1000):
+    """Génère des voisins à partir de la solution actuelle P."""
+    neighbors = []
+    m, n = P.shape
+
+    for _ in range(num_neighbors):
+        P_new = P.copy()
+
+        if neighborhood == 1: 
+            for _ in range(m * n // 4):
+                col1, col2 = np.random.choice(n, 2, replace=False)  # Sélectionner deux colonnes distinctes
+                P_new[:, [col1, col2]] = P_new[:, [col2, col1]]  # Permuter les deux colonnes
+
+        elif neighborhood == 2:
+            for _ in range(m * n // 4):  # Modifier une ligne complète
+                i = np.random.randint(0, m)
+                P_new[i, :] *= -1
+
+        elif neighborhood == 3:
+            for _ in range(m * n // 4):  # Modifier une colonne complète
+                j = np.random.randint(0, n)
+                P_new[:, j] *= -1
+
+        elif neighborhood == 4:  # Modifier plusieurs éléments aléatoires
+            num_changes = np.random.randint(1, m * n // 2)  # Modifier jusqu'à 25% des éléments
+            for _ in range(num_changes):
+                i, j = np.random.randint(0, m), np.random.randint(0, n)
+                P_new[i, j] *= -1
+
+        neighbors.append(P_new)
+
+    return neighbors
+
+def voisinage(P, taille, n, non_zero_indices):
+    voisins = set()
+ 
+    while len(voisins) < taille:
+        voisin = P.copy()
+
+        max_n = min(n, len(non_zero_indices))  # Ne pas dépasser la taille disponible
+        indices_modifiees = np.random.choice(len(non_zero_indices), size=max_n, replace=False)
+
+        for idx in indices_modifiees:
+            i, j = non_zero_indices[idx]
+            voisin[i, j] *= -1
+
+        voisins.add(tuple(map(tuple, voisin)))
+
+    return voisins
+
+def recherche_locale(P, M, taille=10000, n=40):
+    """Recherche locale pour améliorer la matrice P."""
+    s = P.copy()
+    non_zero_indices = np.argwhere(M != 0)
+
+    voisins = list(voisinage(s, taille, n, non_zero_indices))  # Liste de voisins immuables
+
+    i = 0
+    while voisins:
+        indice = np.random.randint(0, len(voisins))
+        s_prime = np.array(voisins[indice])  # Convertir le voisin en tableau NumPy
+
+        if compareP1betterthanP2(M, s_prime, s):
+            print("Iteration:", i)
+            s = s_prime
+            print(fobj(M, s))
+            i += 1
+            voisins = list(voisinage(s, taille, n, non_zero_indices))  # Régénérer les voisins
+        else:
+            voisins.pop(indice)  # Retirer le voisin testé
+
+    return s
+
+def metaheuristic(M, max_iter=100):
     m, n = M.shape
-    P_best = np.ones((m, n))  # Initialisation avec P composé de +1
-    rank_best = calculate_rank(P_best, M)  # Rang initial
+    P_best = np.ones((m, n))
+    n_ = m * n // 4
+    P_best=recherche_locale(P_best, M, taille=10000, n=n_)# Initialisation avec une matrice de +1
+    rank_best = fobj(M, P_best)[0]  # Calcul initial du rang
+    num_neighbors = 1000  # Nombre de voisins générés à chaque étape
+    iter_stop = 0  # Compteur d'arrêt conditionnel
+    liste_rang = []
+    liste_valsing = []
+    iterations = []
 
     for iteration in range(max_iter):
-        for neighborhood in range(1, 5):  # Explorer 4 types de voisinage
-            neighbors = generate_neighbors(P_best, neighborhood,100)
-            sprime = neighbors[np.random.randint(0, 100)]
-            neighbors = generate_neighbors(sprime, neighborhood,1000)
+        iter_stop += 1
+        if iter_stop > 10:
+            print("Aucune amélioration trouvée après 10 itérations. Arrêt.")
+            break
 
-            for P_candidate in neighbors:
-                if compareP1betterthanP2(M,P_candidate,P_best):
-                    P_best = P_candidate
-                    break  # Sortir pour explorer à nouveau à partir de cette meilleure solution
+        neighborhood = 1  # Taille initiale du voisinage
+        improvement_found = False  # Indicateur d'amélioration
+
+        while neighborhood < 5:
+            # Génération des voisins
+            neighbors = generate_neighbors(P_best, neighborhood, num_neighbors=num_neighbors)
+
+            # Sélection aléatoire d'un voisin
+            sprime = neighbors[np.random.randint(0, num_neighbors)]
+
+            # Recherche locale à partir du voisin sélectionné
+            n_ = m * n // 4
+            s_second = recherche_locale(sprime, M, taille=10000, n=n_)
+
+            # Comparaison pour voir si on a trouvé une meilleure solution
+            if compareP1betterthanP2(M, s_second, P_best):
+                P_best = s_second
+                rank_best = fobj(M, P_best)[0]
+                iter_stop = 0  # Réinitialisation du compteur d'arrêt
+                improvement_found = True
+                print(f"Amélioration trouvée à l'itération {iteration}, voisinage {neighborhood}, rang {rank_best}")
+                break  # Sortir du voisinage actuel
+
+            else:
+                # Si aucune amélioration, on augmente la taille du voisinage
+                neighborhood += 1
+
+        # Si aucune amélioration trouvée pour tous les voisinages
+        if not improvement_found:
+            print(f"Aucune amélioration à l'itération {iteration}")
+
+        liste_rang.append(rank_best)
+        iterations.append(iteration)
+        liste_valsing.append(fobj(M, P_best)[1])
+
+    # Affichage du graphique des erreurs
+    plt.figure(figsize=(10, 6))
+    plt.plot(iterations, liste_rang, marker='o', linestyle='-', color='b')
+    plt.title("Évolution des rang en fonction des itérations")
+    plt.xlabel("Itérations")
+    plt.ylabel("Rang ")
+    plt.grid(True)
+    plt.show()
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(iterations, liste_valsing, marker='o', linestyle='-', color='r')
+    plt.title("Évolution de la plus petite valeur singulière en fonction des itérations")
+    plt.xlabel("Itérations")
+    plt.ylabel("La plus petite valeur singulière")
+    plt.grid(True)
+    plt.show()
 
     return P_best
-
-
-
 #%%
-# Exemple d'utilisation
-M = np.array([[4, 0, 1], [1, 1, 1], [1, 1, 0]])
-M = matrices2_slackngon(7)
+M = lecture_fichier("synthetic_matrice.txt")
+start = time.time()
 best_pattern = metaheuristic(M)
-print("Best pattern found:")
-print(best_pattern)
-#%%
-print("Objective:", fobj(M, best_pattern))
+
+end_time = time.time()-start
+hours = int(end_time // 3600)
+minutes = int((end_time % 3600) // 60)
+seconds = end_time % 60
+# Afficher les résultats
+print("\nTemps d'exécution : {:02d}h {:02d}m {:.2f}s".format(hours, minutes, seconds))
+print(fobj(M, best_pattern))
