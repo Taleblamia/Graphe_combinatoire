@@ -180,7 +180,6 @@ def grasp(M, X=3):
     return P, rang_prec, grasp_data
 
 
-
 def search_ligne_indep(matrice, pattern, Transposee =False):
     if Transposee:
         matrice = matrice.T
