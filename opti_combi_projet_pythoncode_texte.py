@@ -142,7 +142,8 @@ def metaheuristic(M, max_iter=50, tabu_size=45):
     """
     Métaheuristique basée sur l'algorithme Tabou pour résoudre le problème du square root rank.
     """
-    data = []  # Collecte des métriques pour le suivi
+    data_rank = []  # Collecte des métriques pour le suivi
+    data_sing = []
     bestPattern = np.ones(M.shape)  # Pattern initial
     tabu_list = []                 # Liste tabou
     best_objective = fobj(M, bestPattern)  # Objectif initial
@@ -161,7 +162,7 @@ def metaheuristic(M, max_iter=50, tabu_size=45):
                 continue  # Ignore les voisins dans la liste tabou
 
             neighbor_objective = fobj(M, neighbor)
-            data.append((iteration, neighbor_objective[0], neighbor_objective[1]))
+            
             if best_neighbor is None or compareP1betterthanP2(M, neighbor, best_neighbor):
                 best_neighbor = neighbor
                 best_neighbor_objective = neighbor_objective
@@ -182,8 +183,10 @@ def metaheuristic(M, max_iter=50, tabu_size=45):
             tabu_list.pop(0)
 
         print(f"Iteration {iteration + 1}: Best rank so far: {best_objective[0]}")
+        data_rank.append(best_objective[0])
+        data_sing.append(best_objective[1])
 
-    return bestPattern, data
+    return bestPattern, data_rank, data_sing
 
 def lecture_fichier(path):
     with open(path, 'r') as fin:  # ouverture du fichier en mode lecture
@@ -212,27 +215,32 @@ def random_matrix(m, n, r):
 
 
 import matplotlib.pyplot as plt
-def plot(grasp_data):
-    cols, rangs, val_sings = zip(*grasp_data)
-    plt.figure(figsize=(12, 6))
-    plt.subplot(1, 2, 1)
-    plt.plot(cols, rangs, label='Rang')
-    plt.xlabel('Colonnes')
+def plot(data_rank, data_sing, iterations = 50):
+    it = []
+    for i in range(iterations):
+        it.append(i)
+
+    # Tracer la courbe
+    plt.plot(it, data_rank)
+
+    # Ajouter un titre et des labels
+    plt.xlabel('iteration')
     plt.ylabel('Rang')
     plt.title('Évolution du Rang (TABU)')
-    plt.grid()
-    plt.legend()
+
+    # Afficher le graphique
+    plt.show()
+
 
     plt.subplot(1, 2, 2)
-    plt.plot(cols, val_sings, color='orange', label='Valeur singulière')
-    plt.xlabel('Colonnes')
+    plt.plot(it, data_sing, color='orange', label='Valeur singulière')
+    plt.xlabel('iteration')
     plt.ylabel('Dernière Valeur Singulière')
-    plt.title('Évolution de la Valeur Singulière (GRASP)')
+    plt.title('Évolution de la Valeur Singulière (TABU)')
     plt.grid()
     plt.legend()
     plt.tight_layout()
     plt.show()
-
 
 m = 120
 n = 120
@@ -247,10 +255,10 @@ r = 8
 M = lecture_fichier('synthetic_matrice.txt')
 #M = matrices1_ledm(20)
 #M = lecture_fichier('120.txt')
-best_pattern, data = metaheuristic(M)
+best_pattern, data_r, data_s = metaheuristic(M)
 # Tracer les métriques
-plot(data)
+plot(data_r, data_s)
 print("Best pattern found:")
 print(best_pattern, '\n')
 print(f"Meilleur rang = {fobj(M, best_pattern)[0]} \n")
-print(f"Meilleure valeur singuliere = {fobj(M, best_pattern)[0]}\n")
+print(f"Meilleure valeur singuliere = {fobj(M, best_pattern)[1]}\n")
