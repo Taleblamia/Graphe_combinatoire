@@ -7,7 +7,7 @@ Created on Mon Dec  2 08:45:59 2024
 
 import numpy as np
 
-
+"""
 # Exemple de matrice
 matrice = [
     [1, 1, 1],
@@ -18,6 +18,7 @@ matrice = [
     [4, 1, 12],
     [8, 2, 24]
 ]
+"""
 
 def sont_colineaires(l1, l2):
     # Vérification que les deux lignes sont colinéaires
@@ -41,7 +42,7 @@ def sont_colineaires(l1, l2):
     
 def find_collinearity(matrice):
     # Trouver les lignes colinéaires
-    n = len(matrice)
+    n, m = np.shape(matrice)
     colineaire_dico = {}
     colineaires = []
     
@@ -78,12 +79,25 @@ def matrice_reduite(matrice, dictionnaire):
     
     return new_matrice
 
+def lecture_fichier(path):
+    with open(path, 'r') as fin:  # ouverture du fichier en mode lecture
+        m, n = map(int, fin.readline().rstrip().split())  # lecture des dimensions m et n
+        data = []  # initialisation d'une liste pour stocker les matrices
+        
+        # Lecture des lignes suivantes contenant les éléments de la matrice
+        for _ in range(m):
+            ligne = list(map(float, fin.readline().rstrip().split()))  
+            data.append(ligne)  
+        
+    return np.array(data)   # Renvoie la matrice sous forme de tableau numpy
+
+matrice = lecture_fichier('synthetic_matrice.txt')
+
 dico = find_collinearity(matrice)
 
 new_mat = matrice_reduite(matrice, dico)
 
-print(matrice)        
-print(new_mat) 
+ 
 print(dico)     
 
 

@@ -249,10 +249,10 @@ r = 8
 # Exemple d'utilisation
 # Générer la matrice ou lire depuis un fichier
 #M = random_matrix(m,n,r) # Exemple de matrice aléatoire
-#M = lecture_fichier('correl5_matrice.txt')
+M = lecture_fichier('correl5_matrice.txt')
 #M = lecture_fichier('ledm6_matrice.txt')
 #M = lecture_fichier('exempleslide_matrice.txt')
-M = lecture_fichier('synthetic_matrice.txt')
+#M = lecture_fichier('synthetic_matrice.txt')
 #M = matrices1_ledm(20)
 #M = lecture_fichier('120.txt')
 best_pattern, data_r, data_s = metaheuristic(M)
