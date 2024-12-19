@@ -204,7 +204,7 @@ def search_ligne_indep(matrice, pattern, Transposee =False):
     return liste_index
 
 
-def use_search_line(M, P, line_list, rang, X=2, num_modifications=3):
+def use_search_line(M, P, line_list, rang, X=2, num_modifications=2):
     """
     Optimise les lignes indépendantes identifiées dans `line_list` avec recherche locale.
 
@@ -232,7 +232,7 @@ def use_search_line(M, P, line_list, rang, X=2, num_modifications=3):
             candidats_lines_set = set()
             candidats_lines = []
             scores = []
-            num_candidats = 2 ** min(m, n) if min(m, n) < 20 else 10000
+            num_candidats = 2 ** min(m, n) if min(m, n) < 20 else 100000
             
             # Générer plusieurs lignes candidates
             while (num_candidats>0):
@@ -369,9 +369,10 @@ if __name__ == "__main__":
     #M = random_matrix(m,n,r) # Exemple de matrice aléatoire
     #M = lecture_fichier('correl5_matrice.txt')
     #M = lecture_fichier('exempleslide_matrice.txt')
-    M = matrices1_ledm(20)
+    #M = matrices1_ledm(20)
     #M = lecture_fichier('120.txt')
     #M = lecture_fichier('file.txt')
+    M = lecture_fichier('synthetic_matrice.txt')
     
     
     verif_amelioration = True
