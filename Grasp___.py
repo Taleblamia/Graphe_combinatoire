@@ -62,7 +62,7 @@ def recherche_locale_colonne(M, P_temp, col, candidats_colonnes, scores, num_mod
     meilleure_colonne = candidats_colonnes[scores.index(meilleur_score)]
     
     for i, col_candidat in enumerate(candidats_colonnes):
-        for _ in range(50):  # Effectuer les 50 essais pour chaque colonne
+        for _ in range(30):  # Effectuer les 30 essais pour chaque colonne
             candidat_modifié = col_candidat.copy()
             indices_modif = np.random.choice(len(candidat_modifié), size=num_modifications, replace=False)
             candidat_modifié[indices_modif] *= -1  # Inverser les coefficients sélectionnés
@@ -99,7 +99,7 @@ def recherche_locale_ligne(M, P_temp, line, candidats_lines, scores, num_modific
     meilleure_line = candidats_lines[scores.index(meilleur_score)]
     amelioration = False
     for i, line_candidat in enumerate(candidats_lines):
-        for _ in range(50):  # Effectuer les 50 essais pour chaque ligne
+        for _ in range(20):  # Effectuer les 20 essais pour chaque ligne
             
             candidat_modifié = line_candidat.copy()
             indices_modif = np.random.choice(len(candidat_modifié), size=num_modifications, replace=False)
@@ -118,7 +118,7 @@ def recherche_locale_ligne(M, P_temp, line, candidats_lines, scores, num_modific
     return meilleure_line, meilleur_score, amelioration
 
 
-def grasp(M, X=3):
+def grasp(M, X=2):
     """
     Implémente l'algorithme GRASP avec recherche locale sur les éléments de la LCR.
     """
@@ -129,7 +129,7 @@ def grasp(M, X=3):
     grasp_data = []  # Collecte des métriques pour le suivi
 
     for col in range(n):
-        num_candidats = 2 ** min(m, n) if min(m, n) < 18 else 200000
+        num_candidats = 2 ** min(m, n) if min(m, n) < 17 else 100000
         candidats_colonnes_set = set()
         candidats_colonnes = []
         scores = []
@@ -203,7 +203,7 @@ def search_ligne_indep(matrice, pattern, Transposee =False):
     return liste_index
 
 
-def use_search_line(M, P, line_list, rang, X=2, num_modifications=2):
+def use_search_line(M, P, line_list, rang, X=2, num_modifications=3):
     """
     Optimise les lignes indépendantes identifiées dans `line_list` avec recherche locale.
 
@@ -231,7 +231,7 @@ def use_search_line(M, P, line_list, rang, X=2, num_modifications=2):
             candidats_lines_set = set()
             candidats_lines = []
             scores = []
-            num_candidats = 2 ** min(m, n) if min(m, n) < 18 else 200000
+            num_candidats = 2 ** min(m, n) if min(m, n) < 17 else 100000
             
             # Générer plusieurs lignes candidates
             while (num_candidats>0):
@@ -366,9 +366,9 @@ if __name__ == "__main__":
 
     # Générer la matrice ou lire depuis un fichier
     #M = random_matrix(m,n,r) # Exemple de matrice aléatoire
-    M = lecture_fichier('correl5_matrice.txt')
+    #M = lecture_fichier('correl5_matrice.txt')
     #M = lecture_fichier('exempleslide_matrice.txt')
-    #M = matrices1_ledm(20)
+    M = matrices1_ledm(120)
     #M = lecture_fichier('120.txt')
     #M = lecture_fichier('file.txt')
     #M = lecture_fichier('synthetic_matrice.txt')
