@@ -129,7 +129,7 @@ def grasp(M, X=3):
     grasp_data = []  # Collecte des métriques pour le suivi
 
     for col in range(n):
-        num_candidats = 2 ** min(m, n) if min(m, n) < 20 else 200000
+        num_candidats = 2 ** min(m, n) if min(m, n) < 18 else 200000
         candidats_colonnes_set = set()
         candidats_colonnes = []
         scores = []
@@ -232,7 +232,7 @@ def use_search_line(M, P, line_list, rang, X=2, num_modifications=2):
             candidats_lines_set = set()
             candidats_lines = []
             scores = []
-            num_candidats = 2 ** min(m, n) if min(m, n) < 20 else 100000
+            num_candidats = 2 ** min(m, n) if min(m, n) < 18 else 200000
             
             # Générer plusieurs lignes candidates
             while (num_candidats>0):
@@ -367,12 +367,12 @@ if __name__ == "__main__":
 
     # Générer la matrice ou lire depuis un fichier
     #M = random_matrix(m,n,r) # Exemple de matrice aléatoire
-    #M = lecture_fichier('correl5_matrice.txt')
+    M = lecture_fichier('correl5_matrice.txt')
     #M = lecture_fichier('exempleslide_matrice.txt')
     #M = matrices1_ledm(20)
     #M = lecture_fichier('120.txt')
     #M = lecture_fichier('file.txt')
-    M = lecture_fichier('synthetic_matrice.txt')
+    #M = lecture_fichier('synthetic_matrice.txt')
     
     
     verif_amelioration = True
